@@ -56,7 +56,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -87,7 +86,6 @@ import io.github.yulbax.frkn.ui.components.groupRowShape
 import io.github.yulbax.frkn.ui.viewmodel.ConnectionViewModel
 import io.github.yulbax.frkn.ui.viewmodel.ProfileViewModel
 import io.github.yulbax.frkn.util.formatRate
-import io.github.yulbax.frkn.vpn.ByeDpiQuality
 import io.github.yulbax.frkn.vpn.ConnectionStats
 import io.github.yulbax.frkn.vpn.VpnState
 import org.koin.androidx.compose.koinViewModel
@@ -148,7 +146,7 @@ fun Connection(
     ) {
         Spacer(Modifier.height(8.dp))
 
-        HeroCard(
+        ConnectionCard(
             state = state,
             stats = stats,
             connected = connected,
@@ -298,7 +296,7 @@ fun Connection(
 }
 
 @Composable
-private fun HeroCard(
+private fun ConnectionCard(
     state: VpnState,
     stats: ConnectionStats,
     connected: Boolean,
@@ -366,14 +364,15 @@ private fun HeroCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (connected && (stats.vpnUp || stats.byedpiUp)) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "↓ ${formatRate(stats.downlink)}   ↑ ${formatRate(stats.uplink)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = content.copy(alpha = 0.85f)
-                    )
-                }
+                val showSpeed = connected && (stats.vpnUp || stats.byedpiUp)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = if (showSpeed) {
+                        "↓ ${formatRate(stats.downlink)}   ↑ ${formatRate(stats.uplink)}"
+                    } else " ",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = content.copy(alpha = if (showSpeed) 0.85f else 0f)
+                )
             }
 
             Spacer(Modifier.width(16.dp))
@@ -544,80 +543,6 @@ private fun SignalBars(reachable: Int, total: Int, checking: Boolean) {
             }
         }
     }
-}
-
-@Composable
-private fun ByeDpiTestDialog(
-    test: ConnectionViewModel.ByeDpiTestState,
-    onRunFull: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val reachable = test.results.count { it.reachable }
-    val done = test.results.size
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.byedpi_test_title)) },
-        text = {
-            Column {
-                Text(
-                    text = stringResource(R.string.byedpi_test_summary, reachable, done, test.total),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                if (test.running && test.total > 0) {
-                    LinearProgressIndicator(
-                        progress = { done.toFloat() / test.total },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                }
-                LazyColumn(modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 360.dp)
-                ) {
-                    test.results.groupBy { it.group }.forEach { (group, rows) ->
-                        item {
-                            Text(
-                                text = "$group · ${rows.count { it.reachable }}/${rows.size}",
-                                style = MaterialTheme.typography.titleSmall,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
-                            )
-                        }
-                        items(rows) { row ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = if (row.reachable) "✓" else "✗",
-                                    color = if (row.reachable) Color(0xFF4CAF50)
-                                    else MaterialTheme.colorScheme.error
-                                )
-                                Text(
-                                    text = row.host,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onRunFull, enabled = !test.running) {
-                Text(stringResource(R.string.byedpi_test_full, ByeDpiQuality.fullTotal))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.ok)) }
-        }
-    )
 }
 
 @Composable
