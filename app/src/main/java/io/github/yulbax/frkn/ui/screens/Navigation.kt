@@ -20,6 +20,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import io.github.yulbax.frkn.R
+import io.github.yulbax.frkn.ui.screens.apps.Apps
+import io.github.yulbax.frkn.ui.screens.frkn.FrknScreen
+import io.github.yulbax.frkn.ui.screens.settings.Settings
 
 sealed class Screen(
     val route: String,
@@ -106,7 +109,7 @@ fun FrknNavHost(
         enterTransition = { fadeIn(animationSpec = tween(200)) },
         exitTransition = { fadeOut(animationSpec = tween(200)) }
     ) {
-        composable(Screen.Main.route) { Connection() }
+        composable(Screen.Main.route) { FrknScreen() }
         composable(Screen.Apps.route) { Apps(query = appsQuery) }
         composable(Screen.Settings.route) { Settings() }
         composable(Screen.Logs.route) { Logs() }

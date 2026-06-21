@@ -214,7 +214,7 @@ object LinkParser {
         }
         if (fp.isNotEmpty()) putJsonObject("utls") {
             put("enabled", true)
-            put("fingerprint", safeFingerprint(fp))
+            put("fingerprint", fp)
         }
         if (reality == true) putJsonObject("reality") {
             put("enabled", true)
@@ -222,12 +222,6 @@ object LinkParser {
             put("short_id", shortId ?: "")
         }
     }
-
-    fun safeFingerprint(fp: String): String =
-        when (fp.lowercase()) {
-            "randomized" -> "random"
-            else -> fp
-        }
 
     private fun URI.queryMap(): Map<String, String> {
         val raw = rawQuery ?: return emptyMap()

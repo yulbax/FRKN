@@ -9,6 +9,9 @@ import io.github.yulbax.frkn.data.SettingsDao
 import io.github.yulbax.frkn.data.SettingsEntity
 import io.github.yulbax.frkn.engine.ByeDpi
 import io.github.yulbax.frkn.util.Diagnostics
+import io.github.yulbax.frkn.vpn.core.Ipv6Mode
+import io.github.yulbax.frkn.vpn.core.TlsFingerprint
+import io.github.yulbax.frkn.vpn.core.TunStack
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -38,35 +41,37 @@ class SettingsViewModel(
 
     private val defaults = SettingsEntity()
 
-    val tunStack: StateFlow<String> = field { it.tunStack }
+    val tunStack: StateFlow<TunStack> = field { TunStack.fromWire(it.tunStack) }
     val mtu: StateFlow<Int> = field { it.mtu }
-    val ipv6Mode: StateFlow<String> = field { it.ipv6Mode }
+    val ipv6Mode: StateFlow<Ipv6Mode> = field { Ipv6Mode.fromWire(it.ipv6Mode) }
     val dnsRemote: StateFlow<String> = field { it.dnsRemote }
     val dnsDirect: StateFlow<String> = field { it.dnsDirect }
     val sniff: StateFlow<Boolean> = field { it.sniff }
     val bypassLan: StateFlow<Boolean> = field { it.bypassLan }
     val autoConnect: StateFlow<Boolean> = field { it.autoConnect }
+    val preferredFingerprint: StateFlow<TlsFingerprint?> = field { TlsFingerprint.fromWire(it.preferredFingerprint) }
 
     fun toggleShowSystemApps() = update { it.copy(showSystemApps = !it.showSystemApps) }
     fun setByeDpiArgs(args: String) = update { it.copy(byeDpiArgs = args) }
 
-    fun setTunStack(value: String) = update { it.copy(tunStack = value) }
+    fun setTunStack(value: TunStack) = update { it.copy(tunStack = value.wire) }
     fun setMtu(value: Int) = update { it.copy(mtu = value) }
-    fun setIpv6Mode(value: String) = update { it.copy(ipv6Mode = value) }
+    fun setIpv6Mode(value: Ipv6Mode) = update { it.copy(ipv6Mode = value.wire) }
     fun setDnsRemote(value: String) = update { it.copy(dnsRemote = value.trim()) }
     fun setDnsDirect(value: String) = update { it.copy(dnsDirect = value.trim()) }
     fun setSniff(value: Boolean) = update { it.copy(sniff = value) }
     fun setBypassLan(value: Boolean) = update { it.copy(bypassLan = value) }
     fun setAutoConnect(value: Boolean) = update { it.copy(autoConnect = value) }
+    fun setPreferredFingerprint(value: TlsFingerprint?) = update { it.copy(preferredFingerprint = value?.wire ?: "") }
     fun exportAppConfig(onReady: (Uri) -> Unit) {
         viewModelScope.launch {
-            runCatching { Diagnostics.exportAppConfig(application, appDao) }.onSuccess(onReady)
+            runCatching { Diagnostics.exportAppConfig(application, appDao, settingsDao) }.onSuccess(onReady)
         }
     }
 
     fun importAppConfig(uri: Uri, onResult: (Diagnostics.ImportResult) -> Unit) {
         viewModelScope.launch {
-            val result = Diagnostics.importAppConfig(application, appDao, uri)
+            val result = Diagnostics.importAppConfig(application, appDao, settingsDao, uri)
             onResult(result)
         }
     }
@@ -75,10 +80,6 @@ class SettingsViewModel(
         .map(selector)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), selector(defaults))
 
-    companion object {
-        val TUN_STACKS = listOf("gvisor", "system", "mixed")
-        val IPV6_MODES = listOf("disable", "enable", "prefer", "only")
-    }
 
     private fun update(transform: (SettingsEntity) -> SettingsEntity) {
         viewModelScope.launch {

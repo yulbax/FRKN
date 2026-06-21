@@ -1,14 +1,13 @@
 package io.github.yulbax.frkn.vpn.singbox
 
-import io.github.yulbax.frkn.util.LinkParser
 import io.github.yulbax.frkn.vpn.core.EngineProxy
 import io.github.yulbax.frkn.vpn.core.NetworkOptions
+import io.github.yulbax.frkn.vpn.core.TlsFingerprint
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -35,13 +34,13 @@ object ConfigBuilder {
         options: NetworkOptions = NetworkOptions()
     ): String {
         require(proxies.isNotEmpty()) { "No proxy outbounds" }
-        val ipv6Enabled = options.ipv6Mode != "disable"
+        val ipv6Enabled = options.ipv6Mode.ipv6Enabled
 
         val proxyOutbounds = proxies.map { proxy ->
             val outbound = JsonObject((Json.parseToJsonElement(proxy.outboundDescriptor) as JsonObject).toMutableMap().apply {
                 put("tag", JsonPrimitive(proxy.tag))
             })
-            sanitizeFingerprint(outbound)
+            applyPreferredFingerprint(outbound, options.preferredFingerprint)
         }
         val defaultTag = proxies.firstOrNull { it.tag == activeProxyTag }?.tag ?: proxies.first().tag
 
@@ -86,7 +85,7 @@ object ConfigBuilder {
                     }
                 }
                 put("final", "remote")
-                put("strategy", dnsStrategy(options.ipv6Mode))
+                put("strategy", options.ipv6Mode.dnsStrategy)
             }
 
             putJsonArray("inbounds") {
@@ -99,7 +98,7 @@ object ConfigBuilder {
                     }
                     put("mtu", options.mtu)
                     put("auto_route", true)
-                    put("stack", options.tunStack)
+                    put("stack", options.tunStack.wire)
                     if (tunneledPackages.isNotEmpty()) {
                         putJsonArray("include_package") {
                             tunneledPackages.forEach { add(it) }
@@ -188,21 +187,15 @@ object ConfigBuilder {
         return json.encodeToString(JsonObject.serializer(), config)
     }
 
-    private fun sanitizeFingerprint(outbound: JsonObject): JsonObject {
+    private fun applyPreferredFingerprint(outbound: JsonObject, preferred: TlsFingerprint?): JsonObject {
+        if (preferred == null) return outbound
         val tls = outbound["tls"] as? JsonObject ?: return outbound
-        val utls = tls["utls"] as? JsonObject ?: return outbound
-        val fp = utls["fingerprint"]?.jsonPrimitive?.content ?: return outbound
-        val safe = LinkParser.safeFingerprint(fp)
-        if (safe == fp) return outbound
-        val newUtls = JsonObject(utls.toMutableMap().apply { put("fingerprint", JsonPrimitive(safe)) })
+        val utls = tls["utls"] as? JsonObject ?: buildJsonObject { put("enabled", true) }
+        val newUtls = JsonObject(utls.toMutableMap().apply {
+            put("enabled", JsonPrimitive(true))
+            put("fingerprint", JsonPrimitive(preferred.wire))
+        })
         val newTls = JsonObject(tls.toMutableMap().apply { put("utls", newUtls) })
         return JsonObject(outbound.toMutableMap().apply { put("tls", newTls) })
-    }
-
-    private fun dnsStrategy(ipv6Mode: String): String = when (ipv6Mode) {
-        "enable" -> "prefer_ipv4"
-        "prefer" -> "prefer_ipv6"
-        "only" -> "ipv6_only"
-        else -> "ipv4_only"
     }
 }

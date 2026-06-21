@@ -41,6 +41,10 @@ LDFLAGS="-X github.com/sagernet/sing-box/constant.Version=${SING_BOX_TAG} -s -w 
 say() { printf '\033[1;36m>>> %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31m!!! %s\033[0m\n' "$*" >&2; exit 1; }
 
+# Diagnostics: on ANY failing command print the exact line, command and exit code,
+# so CI logs pinpoint the real failure instead of just the preceding log line.
+trap 'rc=$?; printf "\033[1;31m!!! build-libbox.sh FAILED: line %s, exit %s, cmd: %s\033[0m\n" "$LINENO" "$rc" "$BASH_COMMAND" >&2' ERR
+
 if [ "${FORCE_REBUILD:-0}" != "1" ] && [ -f "$OUT_AAR" ]; then
   say "libbox.aar already present ($OUT_AAR) — skipping build (FORCE_REBUILD=1 to override)."
   exit 0
@@ -113,6 +117,25 @@ func (s *nativeShellSession) Signal(sig int32) error        { return os.ErrInval
 func (s *nativeShellSession) WaitExit() (int32, error)      { return 0, os.ErrInvalid }
 func (s *nativeShellSession) Close() error                  { return nil }
 EOF
+fi
+
+# ── 2b. FRKN patch: re-seed the "randomized" uTLS fingerprint on every resolve. ──
+# Upstream sets randomizedFingerprint.Seed once in init(), so a process keeps ONE
+# synthetic ClientHello for its whole life — a bad seed never self-heals short of a
+# full process restart. We re-seed on each uTLSClientHelloID("randomized") call, so a
+# fresh engine start yields a fresh fingerprint (the curve-safe Weights are kept).
+FP_FILE="common/tls/utls_client.go"
+if grep -q "FRKN patch: re-seed randomized" "$FP_FILE" 2>/dev/null; then
+  say "uTLS re-seed patch already present."
+elif grep -q "return randomizedFingerprint, nil" "$FP_FILE" 2>/dev/null; then
+  say "Patching $FP_FILE (re-seed randomized per call)"
+  # The `return randomizedFingerprint, nil` line is unique in the file, so a single-line
+  # GNU sed substitution is enough — no perl/multiline needed (keeps CI dependency-free).
+  sed -i 's|return randomizedFingerprint, nil|frknFP := randomizedFingerprint\n\t\tfrknFP.Seed, _ = utls.NewPRNGSeed()\n\t\treturn frknFP, nil // FRKN patch: re-seed randomized|' "$FP_FILE"
+  grep -q "FRKN patch: re-seed randomized" "$FP_FILE" || die "uTLS re-seed patch did not apply — update it for the new upstream source."
+  say "uTLS re-seed patch applied OK."
+else
+  die "Cannot find randomized fingerprint case in $FP_FILE — upstream changed; update the FRKN uTLS patch."
 fi
 
 # ── 3. Pre-flight: assert Tailscale is gone from the dependency graph. ──────────

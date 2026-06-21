@@ -30,6 +30,8 @@
     <string name="vpn_notification_connected">VPN 已启用</string>
     <string name="vpn_notification_stop">停止</string>
     <string name="network_title">网络</string>
+    <string name="tls_fingerprint">TLS 指纹</string>
+    <string name="fingerprint_from_config">使用配置值</string>
     <string name="network_details">高级隧道设置。将在下次连接时生效。</string>
     <string name="tun_stack">TUN 栈</string>
     <string name="mtu">MTU</string>

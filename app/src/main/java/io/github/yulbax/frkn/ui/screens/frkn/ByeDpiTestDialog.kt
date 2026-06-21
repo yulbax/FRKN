@@ -1,4 +1,4 @@
-package io.github.yulbax.frkn.ui.screens
+package io.github.yulbax.frkn.ui.screens.frkn
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

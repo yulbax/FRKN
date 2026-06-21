@@ -41,5 +41,5 @@ gradle/gradle-daemon-jvm.properties
 *.jks
 *.keystore
 
-# Font source archive (extracted into app/src/main/res/font)
-/Google_Sans.zip
+# Personal coding-preferences file, carried across projects
+rules.md
