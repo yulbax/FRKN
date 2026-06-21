@@ -69,7 +69,7 @@ object LinkParser {
             put("security", str("scy").ifEmpty { "auto" })
             put("alter_id", str("aid").toIntOrNull() ?: 0)
             transport(net, path, host, str("path"))?.let { put("transport", it) }
-            if (tls) put("tls", tlsBlock(sni, null, null, null, fp = "", insecure = false))
+            if (tls) put("tls", tlsBlock(sni, null, null, null, fp = "", insecure = false, alpn = str("alpn")))
         }
         return ParsedProfile(name, "vmess", outbound, link)
     }
@@ -91,8 +91,8 @@ object LinkParser {
             q["flow"]?.takeIf { it.isNotEmpty() }?.let { put("flow", it) }
             transport(net, path, host, q["serviceName"])?.let { put("transport", it) }
             when (security) {
-                "tls" -> put("tls", tlsBlock(sni, null, null, null, q["fp"] ?: "", q["allowInsecure"] == "1"))
-                "reality" -> put("tls", tlsBlock(sni, true, q["pbk"], q["sid"], q["fp"] ?: "chrome", false))
+                "tls" -> put("tls", tlsBlock(sni, null, null, null, q["fp"] ?: "", q["allowInsecure"] == "1", q["alpn"] ?: ""))
+                "reality" -> put("tls", tlsBlock(sni, true, q["pbk"], q["sid"], q["fp"] ?: "chrome", false, q["alpn"] ?: ""))
             }
         }
         return ParsedProfile(uri.fragmentName(uri.host), "vless", outbound, link)
@@ -111,7 +111,7 @@ object LinkParser {
             put("server_port", uri.port)
             put("password", uri.userInfo ?: "")
             transport(net, q["path"]?.let { decode(it) } ?: "/", host, q["serviceName"])?.let { put("transport", it) }
-            put("tls", tlsBlock(sni, null, null, null, q["fp"] ?: "", q["allowInsecure"] == "1"))
+            put("tls", tlsBlock(sni, null, null, null, q["fp"] ?: "", q["allowInsecure"] == "1", q["alpn"] ?: ""))
         }
         return ParsedProfile(uri.fragmentName(uri.host), "trojan", outbound, link)
     }
@@ -168,7 +168,7 @@ object LinkParser {
                     q["obfs-password"]?.let { put("password", it) }
                 }
             }
-            put("tls", tlsBlock(sni, null, null, null, "", q["insecure"] == "1"))
+            put("tls", tlsBlock(sni, null, null, null, "", q["insecure"] == "1", q["alpn"] ?: ""))
         }
         return ParsedProfile(uri.fragmentName(uri.host), "hysteria2", outbound, link)
     }
@@ -203,11 +203,15 @@ object LinkParser {
         publicKey: String?,
         shortId: String?,
         fp: String,
-        insecure: Boolean
+        insecure: Boolean,
+        alpn: String = ""
     ): JsonObject = buildJsonObject {
         put("enabled", true)
         if (serverName.isNotEmpty()) put("server_name", serverName)
         if (insecure) put("insecure", true)
+        alpn.split(',').map { it.trim() }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() }?.let {
+            putJsonArray("alpn") { it.forEach { proto -> add(proto) } }
+        }
         if (fp.isNotEmpty()) putJsonObject("utls") {
             put("enabled", true)
             put("fingerprint", safeFingerprint(fp))
