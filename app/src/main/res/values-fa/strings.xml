@@ -30,6 +30,8 @@
     <string name="vpn_notification_connected">VPN فعال است</string>
     <string name="vpn_notification_stop">توقف</string>
     <string name="network_title">شبکه</string>
+    <string name="tls_fingerprint">اثرانگشت TLS</string>
+    <string name="fingerprint_from_config">از کانفیگ</string>
     <string name="network_details">تنظیمات پیشرفته تونل. در اتصال بعدی اعمال می‌شود.</string>
     <string name="tun_stack">پشته TUN</string>
     <string name="mtu">MTU</string>

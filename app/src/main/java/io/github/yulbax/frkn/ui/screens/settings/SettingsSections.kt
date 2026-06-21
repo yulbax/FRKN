@@ -1,4 +1,4 @@
-package io.github.yulbax.frkn.ui.screens
+package io.github.yulbax.frkn.ui.screens.settings
 
 import android.content.Intent
 import android.net.Uri
@@ -6,16 +6,8 @@ import android.provider.Settings as AndroidSettings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Upload
@@ -35,7 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import io.github.yulbax.frkn.R
 import io.github.yulbax.frkn.ui.components.ClickableRow
 import io.github.yulbax.frkn.ui.components.CommittedTextField
@@ -45,75 +36,12 @@ import io.github.yulbax.frkn.ui.components.SwitchRow
 import io.github.yulbax.frkn.ui.components.transparentFieldColors
 import io.github.yulbax.frkn.ui.viewmodel.SettingsViewModel
 import io.github.yulbax.frkn.util.Diagnostics
-import org.koin.androidx.compose.koinViewModel
+import io.github.yulbax.frkn.vpn.core.Ipv6Mode
+import io.github.yulbax.frkn.vpn.core.TlsFingerprint
+import io.github.yulbax.frkn.vpn.core.TunStack
 
 @Composable
-fun Settings(
-    viewModel: SettingsViewModel = koinViewModel()
-) {
-    val showSystemApps by viewModel.showSystemApps.collectAsState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        GroupCard(
-            title = stringResource(R.string.language),
-            items = listOf { LanguagePicker() }
-        )
-
-        GroupCard(
-            title = stringResource(R.string.applications),
-            items = listOf {
-                SwitchRow(stringResource(R.string.show_system_apps), showSystemApps) {
-                    viewModel.toggleShowSystemApps()
-                }
-            }
-        )
-
-        ByeDpiSection(viewModel)
-        AutostartSection(viewModel)
-        NetworkSection(viewModel)
-        BackupSection(viewModel)
-    }
-}
-
-private val LANGUAGE_TAGS = listOf("en", "ru", "zh", "fa")
-private val LANGUAGE_NAMES = mapOf(
-    "en" to "English",
-    "ru" to "Русский",
-    "zh" to "中文",
-    "fa" to "فارسی"
-)
-
-@Composable
-private fun LanguagePicker() {
-    val systemLabel = stringResource(R.string.language_system)
-    val labels = remember(systemLabel) {
-        listOf(systemLabel) + LANGUAGE_TAGS.map { LANGUAGE_NAMES.getValue(it) }
-    }
-    val currentTag = AppCompatDelegate.getApplicationLocales()[0]?.language ?: ""
-    val selected = LANGUAGE_NAMES[currentTag] ?: systemLabel
-
-    DropdownSetting(
-        label = stringResource(R.string.language),
-        options = labels,
-        selected = selected,
-        onSelect = { label ->
-            val tag = LANGUAGE_NAMES.entries.firstOrNull { it.value == label }?.key
-            AppCompatDelegate.setApplicationLocales(
-                if (tag == null) LocaleListCompat.getEmptyLocaleList()
-                else LocaleListCompat.forLanguageTags(tag)
-            )
-        }
-    )
-}
-
-@Composable
-private fun ByeDpiSection(viewModel: SettingsViewModel) {
+internal fun ByeDpiSection(viewModel: SettingsViewModel) {
     val savedByeDpiArgs by viewModel.byeDpiArgs.collectAsState()
     var text by remember { mutableStateOf(savedByeDpiArgs) }
     var focused by remember { mutableStateOf(false) }
@@ -154,7 +82,105 @@ private fun ByeDpiSection(viewModel: SettingsViewModel) {
 }
 
 @Composable
-private fun BackupSection(viewModel: SettingsViewModel) {
+internal fun AutostartSection(viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    val autoConnect by viewModel.autoConnect.collectAsState()
+
+    GroupCard(
+        title = stringResource(R.string.autostart_title),
+        items = listOf(
+            {
+                SwitchRow(stringResource(R.string.auto_connect), autoConnect) {
+                    viewModel.setAutoConnect(it)
+                }
+            },
+            {
+                ClickableRow(label = stringResource(R.string.always_on_vpn)) {
+                    runCatching {
+                        context.startActivity(
+                            Intent(AndroidSettings.ACTION_VPN_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
+            }
+        )
+    )
+}
+
+@Composable
+internal fun NetworkSection(viewModel: SettingsViewModel) {
+    val tunStack by viewModel.tunStack.collectAsState()
+    val mtu by viewModel.mtu.collectAsState()
+    val ipv6Mode by viewModel.ipv6Mode.collectAsState()
+    val dnsRemote by viewModel.dnsRemote.collectAsState()
+    val dnsDirect by viewModel.dnsDirect.collectAsState()
+    val sniff by viewModel.sniff.collectAsState()
+    val bypassLan by viewModel.bypassLan.collectAsState()
+    val preferredFingerprint by viewModel.preferredFingerprint.collectAsState()
+    val fromConfigLabel = stringResource(R.string.fingerprint_from_config)
+
+    GroupCard(
+        title = stringResource(R.string.network_title),
+        items = listOf(
+            {
+                DropdownSetting(
+                    label = stringResource(R.string.tls_fingerprint),
+                    options = listOf(fromConfigLabel) + TlsFingerprint.entries.map { it.wire },
+                    selected = preferredFingerprint?.wire ?: fromConfigLabel,
+                    onSelect = { viewModel.setPreferredFingerprint(TlsFingerprint.fromWire(it)) }
+                )
+            },
+            {
+                DropdownSetting(
+                    label = stringResource(R.string.tun_stack),
+                    options = TunStack.entries.map { it.wire },
+                    selected = tunStack.wire,
+                    onSelect = { viewModel.setTunStack(TunStack.fromWire(it)) }
+                )
+            },
+            {
+                CommittedTextField(
+                    label = stringResource(R.string.mtu),
+                    saved = mtu.toString(),
+                    keyboardType = KeyboardType.Number,
+                    onCommit = { it.trim().toIntOrNull()?.coerceIn(1280, 9000)?.let(viewModel::setMtu) }
+                )
+            },
+            {
+                DropdownSetting(
+                    label = stringResource(R.string.ipv6),
+                    options = Ipv6Mode.entries.map { it.wire },
+                    selected = ipv6Mode.wire,
+                    onSelect = { viewModel.setIpv6Mode(Ipv6Mode.fromWire(it)) }
+                )
+            },
+            {
+                CommittedTextField(
+                    label = stringResource(R.string.remote_dns),
+                    saved = dnsRemote,
+                    onCommit = { if (it.isNotBlank()) viewModel.setDnsRemote(it) }
+                )
+            },
+            {
+                CommittedTextField(
+                    label = stringResource(R.string.direct_dns),
+                    saved = dnsDirect,
+                    onCommit = { if (it.isNotBlank()) viewModel.setDnsDirect(it) }
+                )
+            },
+            {
+                SwitchRow(stringResource(R.string.sniff_destination), sniff) { viewModel.setSniff(it) }
+            },
+            {
+                SwitchRow(stringResource(R.string.bypass_lan), bypassLan) { viewModel.setBypassLan(it) }
+            }
+        )
+    )
+}
+
+@Composable
+internal fun BackupSection(viewModel: SettingsViewModel) {
     val context = LocalContext.current
     val exportAppConfigLabel = stringResource(R.string.export_app_config)
     val importFailedFormat = stringResource(R.string.import_failed)
@@ -203,94 +229,6 @@ private fun BackupSection(viewModel: SettingsViewModel) {
                 ) {
                     importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                 }
-            }
-        )
-    )
-}
-
-@Composable
-private fun AutostartSection(viewModel: SettingsViewModel) {
-    val context = LocalContext.current
-    val autoConnect by viewModel.autoConnect.collectAsState()
-
-    GroupCard(
-        title = stringResource(R.string.autostart_title),
-        items = listOf(
-            {
-                SwitchRow(stringResource(R.string.auto_connect), autoConnect) {
-                    viewModel.setAutoConnect(it)
-                }
-            },
-            {
-                ClickableRow(label = stringResource(R.string.always_on_vpn)) {
-                    runCatching {
-                        context.startActivity(
-                            Intent(AndroidSettings.ACTION_VPN_SETTINGS)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
-                    }
-                }
-            }
-        )
-    )
-}
-
-@Composable
-private fun NetworkSection(viewModel: SettingsViewModel) {
-    val tunStack by viewModel.tunStack.collectAsState()
-    val mtu by viewModel.mtu.collectAsState()
-    val ipv6Mode by viewModel.ipv6Mode.collectAsState()
-    val dnsRemote by viewModel.dnsRemote.collectAsState()
-    val dnsDirect by viewModel.dnsDirect.collectAsState()
-    val sniff by viewModel.sniff.collectAsState()
-    val bypassLan by viewModel.bypassLan.collectAsState()
-
-    GroupCard(
-        title = stringResource(R.string.network_title),
-        items = listOf(
-            {
-                DropdownSetting(
-                    label = stringResource(R.string.tun_stack),
-                    options = SettingsViewModel.TUN_STACKS,
-                    selected = tunStack,
-                    onSelect = viewModel::setTunStack
-                )
-            },
-            {
-                CommittedTextField(
-                    label = stringResource(R.string.mtu),
-                    saved = mtu.toString(),
-                    keyboardType = KeyboardType.Number,
-                    onCommit = { it.trim().toIntOrNull()?.coerceIn(1280, 9000)?.let(viewModel::setMtu) }
-                )
-            },
-            {
-                DropdownSetting(
-                    label = stringResource(R.string.ipv6),
-                    options = SettingsViewModel.IPV6_MODES,
-                    selected = ipv6Mode,
-                    onSelect = viewModel::setIpv6Mode
-                )
-            },
-            {
-                CommittedTextField(
-                    label = stringResource(R.string.remote_dns),
-                    saved = dnsRemote,
-                    onCommit = { if (it.isNotBlank()) viewModel.setDnsRemote(it) }
-                )
-            },
-            {
-                CommittedTextField(
-                    label = stringResource(R.string.direct_dns),
-                    saved = dnsDirect,
-                    onCommit = { if (it.isNotBlank()) viewModel.setDnsDirect(it) }
-                )
-            },
-            {
-                SwitchRow(stringResource(R.string.sniff_destination), sniff) { viewModel.setSniff(it) }
-            },
-            {
-                SwitchRow(stringResource(R.string.bypass_lan), bypassLan) { viewModel.setBypassLan(it) }
             }
         )
     )

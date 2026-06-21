@@ -13,7 +13,7 @@ permissions:
 
 env:
   SING_BOX_TAG: "v1.13.13"
-  LIBBOX_CACHE_REV: "2"    # bump to force a fresh libbox.aar rebuild (busts the cache)
+  LIBBOX_CACHE_REV: "4"    # bump to force a fresh libbox.aar rebuild (busts the cache)
   GO_VERSION: "1.24.7"
   NDK_VERSION: "28.0.13004108"
   ANDROID_COMPILE_SDK: "37.0"
@@ -29,7 +29,7 @@ jobs:
       version: ${{ steps.v.outputs.version }}
       should_release: ${{ steps.v.outputs.should_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: v
         run: |
           VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n1)"
@@ -49,7 +49,7 @@ jobs:
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: cache
         uses: actions/cache@v4
         with:
@@ -86,7 +86,7 @@ jobs:
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           name: libbox

@@ -106,9 +106,6 @@ class HealthMonitor(
         private const val HEALTH_RETRY_MS = 3_000L
         private const val RELOAD_EVERY_N_FAILURES = 4
         private const val REFRESH_SUBSCRIPTION_AFTER_FAILURES = 3
-
-        // The VPN channel just needs reachability through the server; the ByeDPI channel must be
-        // tested against a host that is DPI-blocked in Russia, so success proves desync works.
         private const val VPN_PROBE_URL = "https://www.gstatic.com/generate_204"
         private const val BYEDPI_PROBE_URL = "https://www.youtube.com/generate_204"
     }

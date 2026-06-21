@@ -9,6 +9,7 @@ import io.github.yulbax.frkn.data.App
 import io.github.yulbax.frkn.data.AppConfigBackup
 import io.github.yulbax.frkn.data.AppDao
 import io.github.yulbax.frkn.data.ConnectionType
+import io.github.yulbax.frkn.data.SettingsDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -69,28 +70,35 @@ object Diagnostics {
     }
 
     
-    suspend fun exportAppConfig(context: Context, appDao: AppDao): Uri = withContext(Dispatchers.IO) {
-        val apps = appDao.getAllApps().first()
-        val backup = AppConfigBackup(
-            version = AppConfigBackup.CURRENT_VERSION,
-            apps = apps.associate { it.packageName to it.connectionType.name }
-        )
-        val out = File(shareDir(context), "frkn-apps-${stamp.format(Date())}.json")
-        out.writeText(json.encodeToString(AppConfigBackup.serializer(), backup))
-        uriFor(context, out)
-    }
+    suspend fun exportAppConfig(context: Context, appDao: AppDao, settingsDao: SettingsDao): Uri =
+        withContext(Dispatchers.IO) {
+            val apps = appDao.getAllApps().first()
+            val backup = AppConfigBackup(
+                version = AppConfigBackup.CURRENT_VERSION,
+                apps = apps.associate { it.packageName to it.connectionType.name },
+                settings = settingsDao.observeSettings().first()
+            )
+            val out = File(shareDir(context), "frkn-config-${stamp.format(Date())}.json")
+            out.writeText(json.encodeToString(AppConfigBackup.serializer(), backup))
+            uriFor(context, out)
+        }
 
-    data class ImportResult(val applied: Int, val skipped: Int, val error: String? = null)
+    data class ImportResult(
+        val applied: Int,
+        val skipped: Int,
+        val settingsApplied: Boolean = false,
+        val error: String? = null
+    )
 
-    
-    suspend fun importAppConfig(context: Context, appDao: AppDao, uri: Uri): ImportResult =
+
+    suspend fun importAppConfig(context: Context, appDao: AppDao, settingsDao: SettingsDao, uri: Uri): ImportResult =
         withContext(Dispatchers.IO) {
             val text = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-            }.getOrNull() ?: return@withContext ImportResult(0, 0, "Could not read file")
+            }.getOrNull() ?: return@withContext ImportResult(0, 0, error = "Could not read file")
 
             val backup = runCatching { json.decodeFromString(AppConfigBackup.serializer(), text) }
-                .getOrElse { return@withContext ImportResult(0, 0, "Invalid config file") }
+                .getOrElse { return@withContext ImportResult(0, 0, error = "Invalid config file") }
 
             var applied = 0
             var skipped = 0
@@ -106,7 +114,10 @@ object Diagnostics {
                 applied++
             }
             if (updates.isNotEmpty()) appDao.upsertApps(updates)
-            ImportResult(applied, skipped)
+
+            val settings = backup.settings
+            if (settings != null) settingsDao.upsertSettings(settings.copy(id = 1))
+            ImportResult(applied, skipped, settingsApplied = settings != null)
         }
 
     fun shareIntent(uri: Uri, mimeType: String): Intent =

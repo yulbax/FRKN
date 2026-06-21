@@ -24,8 +24,11 @@ import io.github.yulbax.frkn.vpn.core.ConnectionOwnerInfo
 import io.github.yulbax.frkn.vpn.core.EngineConfig
 import io.github.yulbax.frkn.vpn.core.EngineListener
 import io.github.yulbax.frkn.vpn.core.EngineProxy
+import io.github.yulbax.frkn.vpn.core.Ipv6Mode
 import io.github.yulbax.frkn.vpn.core.NetworkOptions
+import io.github.yulbax.frkn.vpn.core.TlsFingerprint
 import io.github.yulbax.frkn.vpn.core.TunConfig
+import io.github.yulbax.frkn.vpn.core.TunStack
 import io.github.yulbax.frkn.vpn.core.TunPlatform
 import io.github.yulbax.frkn.vpn.core.VpnEngine
 import io.github.yulbax.frkn.vpn.core.freeLoopbackPort
@@ -186,13 +189,14 @@ class FrknVpnService :
             tunneledPackages = tunneledPackages,
             byeDpiSocksPort = byeDpiPort,
             network = NetworkOptions(
-                tunStack = settings.tunStack,
+                tunStack = TunStack.fromWire(settings.tunStack),
                 mtu = settings.mtu,
-                ipv6Mode = settings.ipv6Mode,
+                ipv6Mode = Ipv6Mode.fromWire(settings.ipv6Mode),
                 dnsRemote = settings.dnsRemote,
                 dnsDirect = settings.dnsDirect,
                 sniff = settings.sniff,
-                bypassLan = settings.bypassLan
+                bypassLan = settings.bypassLan,
+                preferredFingerprint = TlsFingerprint.fromWire(settings.preferredFingerprint)
             )
         )
     }

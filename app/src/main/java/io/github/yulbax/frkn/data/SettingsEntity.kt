@@ -2,7 +2,9 @@ package io.github.yulbax.frkn.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity(tableName = "settings")
 data class SettingsEntity(
     @PrimaryKey val id: Int = 1,
@@ -15,5 +17,6 @@ data class SettingsEntity(
     val dnsDirect: String = "1.1.1.1",
     val sniff: Boolean = true,
     val bypassLan: Boolean = false,
-    val autoConnect: Boolean = false
+    val autoConnect: Boolean = false,
+    val preferredFingerprint: String = ""
 )
