@@ -11,5 +11,7 @@ sealed interface VpnState {
 
     data class Reconnecting(val attempt: Int) : VpnState
 
+    data class CyclingFingerprint(val attempt: Int) : VpnState
+
     data class Error(val message: String) : VpnState
 }

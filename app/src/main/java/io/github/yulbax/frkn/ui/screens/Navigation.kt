@@ -109,7 +109,9 @@ fun FrknNavHost(
         enterTransition = { fadeIn(animationSpec = tween(200)) },
         exitTransition = { fadeOut(animationSpec = tween(200)) }
     ) {
-        composable(Screen.Main.route) { FrknScreen() }
+        composable(Screen.Main.route) {
+            FrknScreen(onNavigateToApps = { navController.navigateToScreen(Screen.Apps) })
+        }
         composable(Screen.Apps.route) { Apps(query = appsQuery) }
         composable(Screen.Settings.route) { Settings() }
         composable(Screen.Logs.route) { Logs() }

@@ -64,6 +64,16 @@
     <string name="servers_title">Servers</string>
     <string name="servers_empty">No servers. Tap + to add a config link or subscription.</string>
     <string name="ok">OK</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="got_it">Got it</string>
+    <string name="home_hint">Open the Applications section to choose which apps go through VPN/ByeDPI.</string>
+    <string name="home_hint_action">Open Applications</string>
+    <string name="apps_hint_title">How traffic is routed</string>
+    <string name="apps_hint_direct">direct, no VPN</string>
+    <string name="apps_hint_byedpi">DPI bypass, no VPN</string>
+    <string name="apps_hint_vpn">through the selected server</string>
+    <string name="apps_hint_change">Use the buttons next to an app to change its type. “Apply to all” changes the whole list at once.</string>
+    <string name="apps_hint_ru_default">Packages that contain ru/vk/yandex are Direct by default</string>
     <string name="dialog_error">Error</string>
     <string name="vpn_disconnected">Disconnected</string>
     <string name="vpn_connecting">Connecting…</string>
@@ -76,6 +86,8 @@
     <string name="vpn_checking_connectivity">Checking connectivity</string>
     <string name="vpn_tap_to_disconnect">Tap to disconnect</string>
     <string name="vpn_attempt">Attempt %1$d</string>
+    <string name="vpn_cycling_fingerprint">Adjusting connection…</string>
+    <string name="vpn_cycling_fingerprint_sub">Trying TLS fingerprints, please wait… (%1$d)</string>
     <string name="toggle_connection_cd">Toggle connection</string>
     <string name="channel_status_off">off</string>
     <string name="channel_status_online">online · %1$d ms</string>

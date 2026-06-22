@@ -61,6 +61,16 @@
     <string name="servers_title">سرورها</string>
     <string name="servers_empty">سروری نیست. برای افزودن لینک پیکربندی یا اشتراک، روی + بزنید.</string>
     <string name="ok">تأیید</string>
+    <string name="dismiss">بستن</string>
+    <string name="got_it">متوجه شدم</string>
+    <string name="home_hint">برای انتخاب اینکه کدام برنامه‌ها از VPN/ByeDPI عبور کنند، بخش «برنامه‌ها» را باز کنید.</string>
+    <string name="home_hint_action">باز کردن برنامه‌ها</string>
+    <string name="apps_hint_title">نحوهٔ مسیریابی ترافیک</string>
+    <string name="apps_hint_direct">مستقیم، بدون VPN</string>
+    <string name="apps_hint_byedpi">عبور از DPI، بدون VPN</string>
+    <string name="apps_hint_vpn">از طریق سرور انتخاب‌شده</string>
+    <string name="apps_hint_change">برای تغییر نوع، دکمه‌های کنار هر برنامه را بزنید. «اعمال به همه» کل فهرست را یکجا تغییر می‌دهد.</string>
+    <string name="apps_hint_ru_default">بسته‌هایی که شامل ru/vk/yandex هستند به‌صورت پیش‌فرض روی Direct هستند</string>
     <string name="dialog_error">خطا</string>
     <string name="vpn_disconnected">قطع شد</string>
     <string name="vpn_connecting">در حال اتصال…</string>
@@ -73,6 +83,8 @@
     <string name="vpn_checking_connectivity">در حال بررسی اتصال</string>
     <string name="vpn_tap_to_disconnect">برای قطع بزنید</string>
     <string name="vpn_attempt">تلاش %1$d</string>
+    <string name="vpn_cycling_fingerprint">در حال تنظیم اتصال…</string>
+    <string name="vpn_cycling_fingerprint_sub">در حال آزمودن اثرانگشت‌های TLS… (%1$d)</string>
     <string name="toggle_connection_cd">تغییر وضعیت اتصال</string>
     <string name="channel_status_off">خاموش</string>
     <string name="channel_status_online">آنلاین · %1$d میلی‌ثانیه</string>

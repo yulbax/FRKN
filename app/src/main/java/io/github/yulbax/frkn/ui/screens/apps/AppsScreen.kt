@@ -37,6 +37,7 @@ fun Apps(
     val apps by viewModel.apps.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val appsHintSeen by viewModel.appsHintSeen.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -54,6 +55,7 @@ fun Apps(
 
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
+                    if (!appsHintSeen) AppsHint(onDismiss = viewModel::dismissAppsHint)
                     val snackbarPattern = stringResource(R.string.set_apps_snackbar)
                     val undoLabel = stringResource(R.string.undo)
                     Row(

@@ -9,6 +9,7 @@ import io.github.yulbax.frkn.data.App
 import io.github.yulbax.frkn.data.AppDao
 import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.SettingsDao
+import io.github.yulbax.frkn.data.SettingsEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -34,8 +35,19 @@ data class AppInfo(
 class AppsViewModel(
     private val application: Application,
     private val appDao: AppDao,
-    settingsDao: SettingsDao
+    private val settingsDao: SettingsDao
 ) : ViewModel() {
+
+    val appsHintSeen: StateFlow<Boolean> = settingsDao.observeSettings()
+        .map { it?.appsHintSeen ?: false }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun dismissAppsHint() {
+        viewModelScope.launch {
+            val current = settingsDao.observeSettings().first() ?: SettingsEntity()
+            if (!current.appsHintSeen) settingsDao.upsertSettings(current.copy(appsHintSeen = true))
+        }
+    }
 
     private val _installedApps = MutableStateFlow<List<AppInfo>>(emptyList())
 
@@ -126,7 +138,7 @@ class AppsViewModel(
                 val newApps = apps
                     .filter { it.packageName !in existingPackages }
                     .map { app ->
-                        val type = if (isRussianPackage(app.packageName) || app.isSystemApp) {
+                        val type = if (isRussianPackage(app.packageName)) {
                             ConnectionType.DIRECT
                         } else {
                             ConnectionType.VPN
@@ -144,7 +156,11 @@ class AppsViewModel(
     }
 
     companion object {
-        fun isRussianPackage(packageName: String): Boolean =
-            packageName.split('.').any { it.equals("ru", ignoreCase = true) }
+        fun isRussianPackage(packageName: String): Boolean {
+            val blockedPackages = setOf("ru", "yandex", "vkontakte", "vk")
+            return packageName.split('.').any { segment ->
+                segment.lowercase() in blockedPackages
+            }
+        }
     }
 }

@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import io.github.yulbax.frkn.R
 import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.profile.ProfileEntity
+import io.github.yulbax.frkn.ui.components.HintBanner
 import io.github.yulbax.frkn.ui.components.groupRowShape
 import io.github.yulbax.frkn.ui.viewmodel.ConnectionViewModel
 import io.github.yulbax.frkn.ui.viewmodel.ProfileViewModel
@@ -53,12 +54,14 @@ import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun FrknScreen(
+    onNavigateToApps: () -> Unit = {},
     viewModel: ConnectionViewModel = koinViewModel(),
     profileViewModel: ProfileViewModel = koinViewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val stats by viewModel.stats.collectAsState()
     val hasRoutedApps by viewModel.hasRoutedApps.collectAsState()
+    val homeHintSeen by viewModel.homeHintSeen.collectAsState()
     val profiles by profileViewModel.profiles.collectAsState()
     val selected by profileViewModel.selected.collectAsState()
     val error by profileViewModel.error.collectAsState()
@@ -92,7 +95,8 @@ fun FrknScreen(
     }
 
     val connected = when (state) {
-        VpnState.Verifying, is VpnState.Connected, is VpnState.Reconnecting -> true
+        VpnState.Verifying, is VpnState.Connected, is VpnState.Reconnecting,
+        is VpnState.CyclingFingerprint -> true
         else -> false
     }
 
@@ -104,6 +108,19 @@ fun FrknScreen(
     ) {
         Spacer(Modifier.height(8.dp))
 
+        if (!homeHintSeen) {
+            HintBanner(
+                text = stringResource(R.string.home_hint),
+                actionLabel = stringResource(R.string.home_hint_action),
+                onAction = {
+                    viewModel.dismissHomeHint()
+                    onNavigateToApps()
+                },
+                onDismiss = { viewModel.dismissHomeHint() }
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
         ConnectionCard(
             state = state,
             stats = stats,
@@ -114,11 +131,11 @@ fun FrknScreen(
         )
 
         if (!connected && !hasRoutedApps) {
-            Text(
+            Spacer(Modifier.height(12.dp))
+            HintBanner(
                 text = stringResource(R.string.connection_no_routed_apps),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 12.dp)
+                actionLabel = stringResource(R.string.home_hint_action),
+                onAction = onNavigateToApps
             )
         }
 

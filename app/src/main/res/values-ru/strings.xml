@@ -61,6 +61,16 @@
     <string name="servers_title">Серверы</string>
     <string name="servers_empty">Серверов нет. Нажмите +, чтобы добавить ссылку-конфиг или подписку.</string>
     <string name="ok">ОК</string>
+    <string name="dismiss">Закрыть</string>
+    <string name="got_it">Понятно</string>
+    <string name="home_hint">Откройте раздел «Приложения», чтобы выбрать, какие из них идут через VPN/ByeDPI.</string>
+    <string name="home_hint_action">Открыть приложения</string>
+    <string name="apps_hint_title">Как направляется трафик</string>
+    <string name="apps_hint_direct">напрямую, без VPN</string>
+    <string name="apps_hint_byedpi">обход DPI без VPN</string>
+    <string name="apps_hint_vpn">через выбранный сервер</string>
+    <string name="apps_hint_change">Нажимайте кнопки справа от приложения, чтобы сменить тип. «Применить ко всем» меняет весь список сразу.</string>
+    <string name="apps_hint_ru_default">Пакеты, содержащие ru/vk/yandex, по умолчанию в Direct</string>
     <string name="dialog_error">Ошибка</string>
     <string name="vpn_disconnected">Отключено</string>
     <string name="vpn_connecting">Подключение…</string>
@@ -73,6 +83,8 @@
     <string name="vpn_checking_connectivity">Проверка соединения</string>
     <string name="vpn_tap_to_disconnect">Нажмите для отключения</string>
     <string name="vpn_attempt">Попытка %1$d</string>
+    <string name="vpn_cycling_fingerprint">Подбор подключения…</string>
+    <string name="vpn_cycling_fingerprint_sub">Перебираем TLS-отпечатки, подождите… (%1$d)</string>
     <string name="toggle_connection_cd">Переключить подключение</string>
     <string name="channel_status_off">выкл</string>
     <string name="channel_status_online">онлайн · %1$d мс</string>

@@ -30,5 +30,5 @@ val appModule = module {
     viewModel { AppsViewModel(androidApplication(), get(), get()) }
     viewModel { SettingsViewModel(androidApplication(), get(), get()) }
     viewModel { ProfileViewModel(androidApplication(), get()) }
-    viewModel { ConnectionViewModel(androidApplication(), get(), get(), get()) }
+    viewModel { ConnectionViewModel(androidApplication(), get(), get(), get(), get()) }
 }

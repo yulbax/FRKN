@@ -71,8 +71,15 @@ class SingBoxEngine(
     }
 
     override fun reloadRouting(config: EngineConfig) {
+        runCatching { boxLogFile.takeIf { it.exists() }?.writeText("") }
         commandServer?.startOrReloadService(buildConfig(config), OverrideOptions())
     }
+
+    override fun hasFingerprintError(): Boolean = runCatching {
+        boxLogFile.takeIf { it.exists() }?.useLines { lines ->
+            lines.any { it.contains("unsupported curve", ignoreCase = true) }
+        } ?: false
+    }.getOrDefault(false)
 
     override fun selectProxy(tag: String): Boolean = runCatching {
         Libbox.newStandaloneCommandClient().selectOutbound(ConfigBuilder.PROXY_GROUP_TAG, tag)

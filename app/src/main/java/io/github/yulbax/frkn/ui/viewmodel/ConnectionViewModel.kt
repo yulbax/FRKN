@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yulbax.frkn.data.AppDao
 import io.github.yulbax.frkn.data.ConnectionType
+import io.github.yulbax.frkn.data.SettingsDao
+import io.github.yulbax.frkn.data.SettingsEntity
+import kotlinx.coroutines.flow.first
 import io.github.yulbax.frkn.vpn.ByeDpiQuality
 import io.github.yulbax.frkn.vpn.ConnectionStats
 import io.github.yulbax.frkn.vpn.FrknVpnService
@@ -26,8 +29,20 @@ class ConnectionViewModel(
     private val application: Application,
     vpnStateRepository: VpnStateRepository,
     appDao: AppDao,
+    private val settingsDao: SettingsDao,
     private val commandBus: VpnCommandBus
 ) : ViewModel() {
+
+    val homeHintSeen: StateFlow<Boolean> = settingsDao.observeSettings()
+        .map { it?.homeHintSeen ?: false }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun dismissHomeHint() {
+        viewModelScope.launch {
+            val current = settingsDao.observeSettings().first() ?: SettingsEntity()
+            if (!current.homeHintSeen) settingsDao.upsertSettings(current.copy(homeHintSeen = true))
+        }
+    }
 
     val state: StateFlow<VpnState> = vpnStateRepository.state
     val stats: StateFlow<ConnectionStats> = vpnStateRepository.stats

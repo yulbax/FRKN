@@ -310,7 +310,8 @@ class FrknVpnService :
             byeDpiPort = byeDpiPort.takeIf { byeDpi != null },
             onRefreshSubscription = { refreshSubscription(db) },
             onRecoveryReload = { commandBus.recover() },
-            onByedpiUp = { commandBus.checkByeDpi() }
+            onByedpiUp = { commandBus.checkByeDpi() },
+            isFingerprintError = { engine.hasFingerprintError() }
         )
     }
 

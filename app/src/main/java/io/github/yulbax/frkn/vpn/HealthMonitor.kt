@@ -22,7 +22,8 @@ class HealthMonitor(
         byeDpiPort: Int?,
         onRefreshSubscription: suspend () -> Unit,
         onRecoveryReload: suspend () -> Unit,
-        onByedpiUp: suspend () -> Unit
+        onByedpiUp: suspend () -> Unit,
+        isFingerprintError: () -> Boolean
     ) {
         job?.cancel()
         vpnCountry = ""
@@ -71,9 +72,14 @@ class HealthMonitor(
                     delay((if (vpnUp) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS).milliseconds)
                 } else {
                     failures++
-                    stateRepository.update(VpnState.Reconnecting(failures))
-                    if (failures % REFRESH_SUBSCRIPTION_AFTER_FAILURES == 0) onRefreshSubscription()
-                    if (failures % RELOAD_EVERY_N_FAILURES == 0) onRecoveryReload()
+                    if (isFingerprintError()) {
+                        stateRepository.update(VpnState.CyclingFingerprint(failures))
+                        onRecoveryReload()
+                    } else {
+                        stateRepository.update(VpnState.Reconnecting(failures))
+                        if (failures % REFRESH_SUBSCRIPTION_AFTER_FAILURES == 0) onRefreshSubscription()
+                        if (failures % RELOAD_EVERY_N_FAILURES == 0) onRecoveryReload()
+                    }
                     delay(HEALTH_RETRY_MS.milliseconds)
                 }
             }

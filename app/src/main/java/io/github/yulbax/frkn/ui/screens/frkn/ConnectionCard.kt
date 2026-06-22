@@ -47,18 +47,21 @@ internal fun ConnectionCard(
     onToggle: () -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
-    val busy = state == VpnState.Connecting || state == VpnState.Verifying
+    val cycling = state is VpnState.CyclingFingerprint
+    val busy = state == VpnState.Connecting || state == VpnState.Verifying || cycling
     val isError = state is VpnState.Error || state is VpnState.Reconnecting
     val vivid = isError || connected || busy
 
     val targetTop = when {
         isError -> Color(0xFFB3261E)
+        cycling -> Color(0xFFF9A825)
         connected -> Color(0xFF2E7D32)
         busy -> Color(0xFFF9A825)
         else -> scheme.surfaceVariant
     }
     val targetBottom = when {
         isError -> Color(0xFF8C1D18)
+        cycling -> Color(0xFFF57F17)
         connected -> Color(0xFF1B5E20)
         busy -> Color(0xFFF57F17)
         else -> scheme.surface
@@ -75,6 +78,7 @@ internal fun ConnectionCard(
         VpnState.Verifying -> stringResource(R.string.vpn_verifying)
         is VpnState.Connected -> stringResource(R.string.vpn_connected)
         is VpnState.Reconnecting -> stringResource(R.string.vpn_reconnecting)
+        is VpnState.CyclingFingerprint -> stringResource(R.string.vpn_cycling_fingerprint)
         is VpnState.Error -> stringResource(R.string.vpn_not_connected)
     }
     val subtitle = when (state) {
@@ -83,6 +87,7 @@ internal fun ConnectionCard(
         VpnState.Verifying -> stringResource(R.string.vpn_checking_connectivity)
         is VpnState.Connected -> stringResource(R.string.vpn_tap_to_disconnect)
         is VpnState.Reconnecting -> stringResource(R.string.vpn_attempt, state.attempt)
+        is VpnState.CyclingFingerprint -> stringResource(R.string.vpn_cycling_fingerprint_sub, state.attempt)
         is VpnState.Error -> state.message
     }
     Box(

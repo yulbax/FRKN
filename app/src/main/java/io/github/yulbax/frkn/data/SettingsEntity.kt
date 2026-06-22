@@ -18,5 +18,7 @@ data class SettingsEntity(
     val sniff: Boolean = true,
     val bypassLan: Boolean = false,
     val autoConnect: Boolean = false,
-    val preferredFingerprint: String = ""
+    val preferredFingerprint: String = "",
+    val homeHintSeen: Boolean = false,
+    val appsHintSeen: Boolean = false
 )

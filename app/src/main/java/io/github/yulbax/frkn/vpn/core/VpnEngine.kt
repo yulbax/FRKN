@@ -11,6 +11,8 @@ interface VpnEngine {
 
     fun selectProxy(tag: String): Boolean
 
+    fun hasFingerprintError(): Boolean
+
     fun stop()
 }
 
