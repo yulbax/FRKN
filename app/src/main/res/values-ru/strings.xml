@@ -54,8 +54,12 @@
     <string name="export_logs">Экспорт логов</string>
     <string name="export_app_config">Экспорт настроек приложений</string>
     <string name="import_app_config">Импорт настроек приложений</string>
-    <string name="import_done">Применено к %1$d приложениям, пропущено %2$d (не установлены).</string>
+    <string name="import_done">Приложения: %1$d применено, %2$d пропущено · Серверы: %3$d добавлено</string>
     <string name="import_failed">Не удалось импортировать: %1$s</string>
+    <string name="import_invalid_file">Неверный или нечитаемый файл</string>
+    <string name="backup_export_title">Что экспортировать</string>
+    <string name="backup_import_title">Что импортировать</string>
+    <string name="export">Экспорт</string>
 
     <string name="connection_no_routed_apps">Пока ни одно приложение не маршрутизируется. Откройте «Приложения» и назначьте хотя бы одно на VPN или ByeDPI перед подключением.</string>
     <string name="servers_title">Серверы</string>
@@ -76,13 +80,11 @@
     <string name="vpn_connecting">Подключение…</string>
     <string name="vpn_verifying">Проверка…</string>
     <string name="vpn_connected">Подключено</string>
-    <string name="vpn_reconnecting">Переподключение</string>
     <string name="vpn_not_connected">Не подключено</string>
     <string name="vpn_tap_to_connect">Нажмите для подключения</string>
     <string name="vpn_establishing_tunnel">Установка туннеля</string>
     <string name="vpn_checking_connectivity">Проверка соединения</string>
     <string name="vpn_tap_to_disconnect">Нажмите для отключения</string>
-    <string name="vpn_attempt">Попытка %1$d</string>
     <string name="toggle_connection_cd">Переключить подключение</string>
     <string name="channel_status_off">выкл</string>
     <string name="channel_status_online">онлайн · %1$d мс</string>

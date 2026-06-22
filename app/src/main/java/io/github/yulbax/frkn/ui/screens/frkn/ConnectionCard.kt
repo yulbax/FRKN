@@ -48,8 +48,7 @@ internal fun ConnectionCard(
     onToggle: () -> Unit
 ) {
     val scheme = MaterialTheme.colorScheme
-    val busy = state == VpnState.Connecting || state == VpnState.Verifying ||
-        state is VpnState.Reconnecting
+    val busy = state == VpnState.Connecting || state == VpnState.Verifying
     val isError = state is VpnState.Error
     val vivid = isError || connected || busy
 
@@ -76,7 +75,6 @@ internal fun ConnectionCard(
         VpnState.Connecting -> stringResource(R.string.vpn_connecting)
         VpnState.Verifying -> stringResource(R.string.vpn_verifying)
         is VpnState.Connected -> stringResource(R.string.vpn_connected)
-        is VpnState.Reconnecting -> stringResource(R.string.vpn_reconnecting)
         is VpnState.Error -> stringResource(R.string.vpn_not_connected)
     }
     val subtitle = when (state) {
@@ -84,7 +82,6 @@ internal fun ConnectionCard(
         VpnState.Connecting -> stringResource(R.string.vpn_establishing_tunnel)
         VpnState.Verifying -> stringResource(R.string.vpn_checking_connectivity)
         is VpnState.Connected -> stringResource(R.string.vpn_tap_to_disconnect)
-        is VpnState.Reconnecting -> stringResource(R.string.vpn_attempt, state.attempt)
         is VpnState.Error -> state.message
     }
     Box(

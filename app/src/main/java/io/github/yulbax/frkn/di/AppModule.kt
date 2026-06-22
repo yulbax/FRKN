@@ -28,7 +28,7 @@ val appModule = module {
     single(createdAtStart = true) { AppSyncManager(androidContext(), get()) }
 
     viewModel { AppsViewModel(androidApplication(), get(), get()) }
-    viewModel { SettingsViewModel(androidApplication(), get(), get()) }
+    viewModel { SettingsViewModel(androidApplication(), get(), get(), get()) }
     viewModel { ProfileViewModel(androidApplication(), get()) }
     viewModel { ConnectionViewModel(androidApplication(), get(), get(), get(), get()) }
 }

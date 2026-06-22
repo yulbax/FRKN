@@ -9,7 +9,5 @@ sealed interface VpnState {
 
     data class Connected(val latencyMs: Int) : VpnState
 
-    data class Reconnecting(val attempt: Int) : VpnState
-
     data class Error(val message: String) : VpnState
 }

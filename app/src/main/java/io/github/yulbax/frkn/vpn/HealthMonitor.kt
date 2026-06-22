@@ -78,7 +78,7 @@ class HealthMonitor(
                 if (anyUp) {
                     stateRepository.update(VpnState.Connected(vpnDelay ?: byedpiDelay ?: 0))
                 } else {
-                    stateRepository.update(VpnState.Reconnecting(failures))
+                    stateRepository.update(VpnState.Verifying)
                 }
 
                 if (!allActiveUp) {

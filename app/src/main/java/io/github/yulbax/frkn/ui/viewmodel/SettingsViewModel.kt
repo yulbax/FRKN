@@ -4,9 +4,11 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.yulbax.frkn.data.AppConfigBackup
 import io.github.yulbax.frkn.data.AppDao
 import io.github.yulbax.frkn.data.SettingsDao
 import io.github.yulbax.frkn.data.SettingsEntity
+import io.github.yulbax.frkn.data.profile.ProfileDao
 import io.github.yulbax.frkn.engine.ByeDpi
 import io.github.yulbax.frkn.util.Diagnostics
 import io.github.yulbax.frkn.vpn.core.Ipv6Mode
@@ -22,7 +24,8 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val application: Application,
     private val settingsDao: SettingsDao,
-    private val appDao: AppDao
+    private val appDao: AppDao,
+    private val profileDao: ProfileDao
 ) : ViewModel() {
 
     private val settings: StateFlow<SettingsEntity> = settingsDao.observeSettings()
@@ -47,16 +50,27 @@ class SettingsViewModel(
     fun setBypassLan(value: Boolean) = update { it.copy(bypassLan = value) }
     fun setAutoConnect(value: Boolean) = update { it.copy(autoConnect = value) }
     fun setPreferredFingerprint(value: TlsFingerprint?) = update { it.copy(preferredFingerprint = value?.wire ?: "") }
-    fun exportAppConfig(onReady: (Uri) -> Unit) {
+    fun exportConfig(selection: Diagnostics.BackupSelection, onReady: (Uri) -> Unit) {
         viewModelScope.launch {
-            runCatching { Diagnostics.exportAppConfig(application, appDao, settingsDao) }.onSuccess(onReady)
+            runCatching {
+                Diagnostics.exportConfig(application, appDao, settingsDao, profileDao, selection)
+            }.onSuccess(onReady)
         }
     }
 
-    fun importAppConfig(uri: Uri, onResult: (Diagnostics.ImportResult) -> Unit) {
+    fun prepareImport(uri: Uri, onParsed: (AppConfigBackup?) -> Unit) {
         viewModelScope.launch {
-            val result = Diagnostics.importAppConfig(application, appDao, settingsDao, uri)
-            onResult(result)
+            onParsed(Diagnostics.inspectBackup(application, uri))
+        }
+    }
+
+    fun applyImport(
+        backup: AppConfigBackup,
+        selection: Diagnostics.BackupSelection,
+        onResult: (Diagnostics.ImportResult) -> Unit
+    ) {
+        viewModelScope.launch {
+            onResult(Diagnostics.applyBackup(appDao, settingsDao, profileDao, backup, selection))
         }
     }
 

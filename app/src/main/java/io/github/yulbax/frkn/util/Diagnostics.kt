@@ -10,6 +10,7 @@ import io.github.yulbax.frkn.data.AppConfigBackup
 import io.github.yulbax.frkn.data.AppDao
 import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.SettingsDao
+import io.github.yulbax.frkn.data.profile.ProfileDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -70,40 +71,62 @@ object Diagnostics {
     }
 
     
-    suspend fun exportAppConfig(context: Context, appDao: AppDao, settingsDao: SettingsDao): Uri =
-        withContext(Dispatchers.IO) {
-            val apps = appDao.getAllApps().first()
-            val backup = AppConfigBackup(
-                version = AppConfigBackup.CURRENT_VERSION,
-                apps = apps.associate { it.packageName to it.connectionType.name },
-                settings = settingsDao.observeSettings().first()
-            )
-            val out = File(shareDir(context), "frkn-config-${stamp.format(Date())}.json")
-            out.writeText(json.encodeToString(AppConfigBackup.serializer(), backup))
-            uriFor(context, out)
-        }
-
-    data class ImportResult(
-        val applied: Int,
-        val skipped: Int,
-        val settingsApplied: Boolean = false,
-        val error: String? = null
+    data class BackupSelection(
+        val settings: Boolean,
+        val apps: Boolean,
+        val profiles: Boolean
     )
 
+    suspend fun exportConfig(
+        context: Context,
+        appDao: AppDao,
+        settingsDao: SettingsDao,
+        profileDao: ProfileDao,
+        selection: BackupSelection
+    ): Uri = withContext(Dispatchers.IO) {
+        val backup = AppConfigBackup(
+            version = AppConfigBackup.CURRENT_VERSION,
+            apps = if (selection.apps)
+                appDao.getAllApps().first().associate { it.packageName to it.connectionType.name }
+            else null,
+            settings = if (selection.settings) settingsDao.observeSettings().first() else null,
+            profiles = if (selection.profiles) profileDao.observeAll().first() else null
+        )
+        val out = File(shareDir(context), "frkn-config-${stamp.format(Date())}.json")
+        out.writeText(json.encodeToString(AppConfigBackup.serializer(), backup))
+        uriFor(context, out)
+    }
 
-    suspend fun importAppConfig(context: Context, appDao: AppDao, settingsDao: SettingsDao, uri: Uri): ImportResult =
+    suspend fun inspectBackup(context: Context, uri: Uri): AppConfigBackup? =
         withContext(Dispatchers.IO) {
             val text = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-            }.getOrNull() ?: return@withContext ImportResult(0, 0, error = "Could not read file")
+            }.getOrNull() ?: return@withContext null
+            runCatching { json.decodeFromString(AppConfigBackup.serializer(), text) }.getOrNull()
+        }
 
-            val backup = runCatching { json.decodeFromString(AppConfigBackup.serializer(), text) }
-                .getOrElse { return@withContext ImportResult(0, 0, error = "Invalid config file") }
+    data class ImportResult(
+        val applied: Int = 0,
+        val skipped: Int = 0,
+        val settingsApplied: Boolean = false,
+        val profilesAdded: Int = 0,
+        val profilesSkipped: Int = 0,
+        val error: String? = null
+    )
 
-            var applied = 0
-            var skipped = 0
+    suspend fun applyBackup(
+        appDao: AppDao,
+        settingsDao: SettingsDao,
+        profileDao: ProfileDao,
+        backup: AppConfigBackup,
+        selection: BackupSelection
+    ): ImportResult = withContext(Dispatchers.IO) {
+        var applied = 0
+        var skipped = 0
+        val apps = backup.apps
+        if (selection.apps && apps != null) {
             val updates = mutableListOf<App>()
-            for ((pkg, typeName) in backup.apps) {
+            for ((pkg, typeName) in apps) {
                 val type = runCatching { ConnectionType.valueOf(typeName) }.getOrNull()
                 val app = if (type != null) appDao.getApp(pkg) else null
                 if (type == null || app == null) {
@@ -114,11 +137,35 @@ object Diagnostics {
                 applied++
             }
             if (updates.isNotEmpty()) appDao.upsertApps(updates)
-
-            val settings = backup.settings
-            if (settings != null) settingsDao.upsertSettings(settings.copy(id = 1))
-            ImportResult(applied, skipped, settingsApplied = settings != null)
         }
+
+        var settingsApplied = false
+        val settings = backup.settings
+        if (selection.settings && settings != null) {
+            settingsDao.upsertSettings(settings.copy(id = 1))
+            settingsApplied = true
+        }
+
+        var profilesAdded = 0
+        var profilesSkipped = 0
+        val profiles = backup.profiles
+        if (selection.profiles && profiles != null) {
+            val existingLinks = profileDao.observeAll().first().mapTo(HashSet()) { it.link }
+            for (profile in profiles) {
+                if (profile.link.isBlank() || !existingLinks.add(profile.link)) {
+                    profilesSkipped++
+                    continue
+                }
+                profileDao.insert(profile.copy(id = 0, selected = false))
+                profilesAdded++
+            }
+            if (profileDao.getSelected() == null) {
+                profileDao.observeAll().first().firstOrNull()?.let { profileDao.selectExclusive(it.id) }
+            }
+        }
+
+        ImportResult(applied, skipped, settingsApplied, profilesAdded, profilesSkipped)
+    }
 
     fun shareIntent(uri: Uri, mimeType: String): Intent =
         Intent(Intent.ACTION_SEND).apply {

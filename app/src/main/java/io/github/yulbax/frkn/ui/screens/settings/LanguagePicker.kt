@@ -8,32 +8,36 @@ import androidx.core.os.LocaleListCompat
 import io.github.yulbax.frkn.R
 import io.github.yulbax.frkn.ui.components.DropdownSetting
 
-private val LANGUAGE_TAGS = listOf("en", "ru", "zh", "fa")
-private val LANGUAGE_NAMES = mapOf(
-    "en" to "English",
-    "ru" to "Русский",
-    "zh" to "中文",
-    "fa" to "فارسی"
-)
+private enum class AppLanguage(val tag: String, val displayName: String) {
+    English("en", "English"),
+    Russian("ru", "Русский"),
+    Chinese("zh", "中文"),
+    Persian("fa", "فارسی");
+
+    companion object {
+        fun fromTag(tag: String): AppLanguage? = entries.firstOrNull { it.tag == tag }
+        fun fromName(name: String): AppLanguage? = entries.firstOrNull { it.displayName == name }
+    }
+}
 
 @Composable
 internal fun LanguagePicker() {
     val systemLabel = stringResource(R.string.language_system)
     val labels = remember(systemLabel) {
-        listOf(systemLabel) + LANGUAGE_TAGS.map { LANGUAGE_NAMES.getValue(it) }
+        listOf(systemLabel) + AppLanguage.entries.map { it.displayName }
     }
     val currentTag = AppCompatDelegate.getApplicationLocales()[0]?.language ?: ""
-    val selected = LANGUAGE_NAMES[currentTag] ?: systemLabel
+    val selected = AppLanguage.fromTag(currentTag)?.displayName ?: systemLabel
 
     DropdownSetting(
         label = stringResource(R.string.language),
         options = labels,
         selected = selected,
         onSelect = { label ->
-            val tag = LANGUAGE_NAMES.entries.firstOrNull { it.value == label }?.key
+            val language = AppLanguage.fromName(label)
             AppCompatDelegate.setApplicationLocales(
-                if (tag == null) LocaleListCompat.getEmptyLocaleList()
-                else LocaleListCompat.forLanguageTags(tag)
+                if (language == null) LocaleListCompat.getEmptyLocaleList()
+                else LocaleListCompat.forLanguageTags(language.tag)
             )
         }
     )

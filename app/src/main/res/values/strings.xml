@@ -54,12 +54,13 @@
     <string name="export_logs">Export logs</string>
     <string name="export_app_config">Export app config</string>
     <string name="import_app_config">Import app config</string>
-    <string name="import_done">Applied to %1$d apps, %2$d skipped (not installed).</string>
+    <string name="import_done">Apps: %1$d applied, %2$d skipped · Servers: %3$d added</string>
     <string name="import_failed">Import failed: %1$s</string>
+    <string name="import_invalid_file">Invalid or unreadable file</string>
+    <string name="backup_export_title">What to export</string>
+    <string name="backup_import_title">What to import</string>
+    <string name="export">Export</string>
 
-    <string name="connection_direct">Direct</string>
-    <string name="channel_vpn">VPN</string>
-    <string name="channel_byedpi">ByeDPI</string>
     <string name="connection_no_routed_apps">No apps are routed yet. Open Applications and set at least one app to VPN or ByeDPI before connecting.</string>
     <string name="servers_title">Servers</string>
     <string name="servers_empty">No servers. Tap + to add a config link or subscription.</string>
@@ -79,13 +80,11 @@
     <string name="vpn_connecting">Connecting…</string>
     <string name="vpn_verifying">Verifying…</string>
     <string name="vpn_connected">Connected</string>
-    <string name="vpn_reconnecting">Reconnecting</string>
     <string name="vpn_not_connected">Not connected</string>
     <string name="vpn_tap_to_connect">Tap to connect</string>
     <string name="vpn_establishing_tunnel">Establishing tunnel</string>
     <string name="vpn_checking_connectivity">Checking connectivity</string>
     <string name="vpn_tap_to_disconnect">Tap to disconnect</string>
-    <string name="vpn_attempt">Attempt %1$d</string>
     <string name="toggle_connection_cd">Toggle connection</string>
     <string name="channel_status_off">off</string>
     <string name="channel_status_online">online · %1$d ms</string>

@@ -54,8 +54,12 @@
     <string name="export_logs">خروجی گرفتن گزارش‌ها</string>
     <string name="export_app_config">خروجی پیکربندی برنامه‌ها</string>
     <string name="import_app_config">ورود پیکربندی برنامه‌ها</string>
-    <string name="import_done">روی %1$d برنامه اعمال شد، %2$d مورد رد شد (نصب‌نشده).</string>
+    <string name="import_done">برنامه‌ها: %1$d اعمال، %2$d رد · سرورها: %3$d افزوده</string>
     <string name="import_failed">ورود ناموفق بود: %1$s</string>
+    <string name="import_invalid_file">فایل نامعتبر یا غیرقابل‌خواندن</string>
+    <string name="backup_export_title">چه چیزی صادر شود</string>
+    <string name="backup_import_title">چه چیزی وارد شود</string>
+    <string name="export">خروجی گرفتن</string>
 
     <string name="connection_no_routed_apps">هنوز هیچ برنامه‌ای مسیردهی نشده است. پیش از اتصال، «برنامه‌ها» را باز کنید و حداقل یک برنامه را روی VPN یا ByeDPI تنظیم کنید.</string>
     <string name="servers_title">سرورها</string>
@@ -76,13 +80,11 @@
     <string name="vpn_connecting">در حال اتصال…</string>
     <string name="vpn_verifying">در حال بررسی…</string>
     <string name="vpn_connected">متصل شد</string>
-    <string name="vpn_reconnecting">در حال اتصال مجدد</string>
     <string name="vpn_not_connected">متصل نیست</string>
     <string name="vpn_tap_to_connect">برای اتصال بزنید</string>
     <string name="vpn_establishing_tunnel">در حال برقراری تونل</string>
     <string name="vpn_checking_connectivity">در حال بررسی اتصال</string>
     <string name="vpn_tap_to_disconnect">برای قطع بزنید</string>
-    <string name="vpn_attempt">تلاش %1$d</string>
     <string name="toggle_connection_cd">تغییر وضعیت اتصال</string>
     <string name="channel_status_off">خاموش</string>
     <string name="channel_status_online">آنلاین · %1$d میلی‌ثانیه</string>

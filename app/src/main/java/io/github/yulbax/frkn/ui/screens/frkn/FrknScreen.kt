@@ -96,7 +96,7 @@ fun FrknScreen(
     }
 
     val connected = when (state) {
-        VpnState.Verifying, is VpnState.Connected, is VpnState.Reconnecting -> true
+        VpnState.Verifying, is VpnState.Connected -> true
         else -> false
     }
 

@@ -54,8 +54,12 @@
     <string name="export_logs">导出日志</string>
     <string name="export_app_config">导出应用配置</string>
     <string name="import_app_config">导入应用配置</string>
-    <string name="import_done">已应用到 %1$d 个应用，跳过 %2$d 个（未安装）。</string>
+    <string name="import_done">应用：应用 %1$d 个，跳过 %2$d 个 · 服务器：新增 %3$d 个</string>
     <string name="import_failed">导入失败：%1$s</string>
+    <string name="import_invalid_file">文件无效或无法读取</string>
+    <string name="backup_export_title">导出内容</string>
+    <string name="backup_import_title">导入内容</string>
+    <string name="export">导出</string>
 
     <string name="connection_no_routed_apps">尚未路由任何应用。请先打开“应用”，将至少一个应用设为 VPN 或 ByeDPI，再进行连接。</string>
     <string name="servers_title">服务器</string>
@@ -76,13 +80,11 @@
     <string name="vpn_connecting">正在连接…</string>
     <string name="vpn_verifying">正在验证…</string>
     <string name="vpn_connected">已连接</string>
-    <string name="vpn_reconnecting">正在重连</string>
     <string name="vpn_not_connected">未连接</string>
     <string name="vpn_tap_to_connect">点按以连接</string>
     <string name="vpn_establishing_tunnel">正在建立隧道</string>
     <string name="vpn_checking_connectivity">正在检查连接</string>
     <string name="vpn_tap_to_disconnect">点按以断开</string>
-    <string name="vpn_attempt">第 %1$d 次尝试</string>
     <string name="toggle_connection_cd">切换连接</string>
     <string name="channel_status_off">关闭</string>
     <string name="channel_status_online">在线 · %1$d 毫秒</string>
