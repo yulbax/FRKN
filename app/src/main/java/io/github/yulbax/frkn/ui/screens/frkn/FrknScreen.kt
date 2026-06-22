@@ -17,15 +17,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,11 +64,8 @@ fun FrknScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val stats by viewModel.stats.collectAsState()
-    val hasRoutedApps by viewModel.hasRoutedApps.collectAsState()
-    val homeHintSeen by viewModel.homeHintSeen.collectAsState()
-    val profiles by profileViewModel.profiles.collectAsState()
-    val selected by profileViewModel.selected.collectAsState()
-    val error by profileViewModel.error.collectAsState()
+    val ui by viewModel.uiState.collectAsState()
+    val servers by profileViewModel.uiState.collectAsState()
     val context = LocalContext.current
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -108,7 +109,7 @@ fun FrknScreen(
     ) {
         Spacer(Modifier.height(8.dp))
 
-        if (!homeHintSeen) {
+        if (!ui.homeHintSeen) {
             HintBanner(
                 text = stringResource(R.string.home_hint),
                 actionLabel = stringResource(R.string.home_hint_action),
@@ -126,11 +127,11 @@ fun FrknScreen(
             stats = stats,
             connected = connected,
             enabled = state != VpnState.Connecting &&
-                (connected || (selected != null && hasRoutedApps)),
+                (connected || (servers.selected != null && ui.hasRoutedApps)),
             onToggle = { if (connected) viewModel.stopVpn() else onConnectClick() }
         )
 
-        if (!connected && !hasRoutedApps) {
+        if (!connected && !ui.hasRoutedApps) {
             Spacer(Modifier.height(12.dp))
             HintBanner(
                 text = stringResource(R.string.connection_no_routed_apps),
@@ -192,12 +193,21 @@ fun FrknScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 16.dp)
             )
-            IconButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_server_cd))
+            TextButton(
+                onClick = { showAddDialog = true },
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonDefaults.IconSize)
+                )
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(stringResource(R.string.add_server))
             }
         }
 
-        if (profiles.isEmpty()) {
+        if (servers.profiles.isEmpty()) {
             Text(
                 text = stringResource(R.string.servers_empty),
                 style = MaterialTheme.typography.bodySmall,
@@ -217,10 +227,10 @@ fun FrknScreen(
                     contentPadding = PaddingValues(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(profiles, key = { it.id }) { profile ->
+                    items(servers.profiles, key = { it.id }) { profile ->
                         ServerRow(
                             profile = profile,
-                            isSelected = profile.id == selected?.id,
+                            isSelected = profile.id == servers.selected?.id,
                             onSelect = { profileViewModel.select(profile) },
                             onEdit = { editing = profile },
                             onShare = {
@@ -240,10 +250,7 @@ fun FrknScreen(
     if (showAddDialog) {
         AddServerDialog(
             onDismiss = { showAddDialog = false },
-            onAddLink = { profileViewModel.addLink(it); showAddDialog = false },
-            onImportSubscription = {
-                profileViewModel.importSubscription(it); showAddDialog = false
-            }
+            onAdd = { profileViewModel.add(it); showAddDialog = false }
         )
     }
 
@@ -258,7 +265,7 @@ fun FrknScreen(
         )
     }
 
-    error?.let { message ->
+    servers.error?.let { message ->
         AlertDialog(
             onDismissRequest = { profileViewModel.clearError() },
             confirmButton = {

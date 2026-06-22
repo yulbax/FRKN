@@ -19,15 +19,9 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.1.1"
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        externalNativeBuild {
-            cmake {
-                cFlags += "-std=c99"
-            }
-        }
     }
 
     externalNativeBuild {
@@ -52,7 +46,7 @@ android {
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
-                storeFile = file(releaseStoreFile!!)
+                storeFile = file(releaseStoreFile)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
@@ -69,6 +63,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            if (hasReleaseKeystore) signingConfig = signingConfigs.getByName("release")
         }
     }
 

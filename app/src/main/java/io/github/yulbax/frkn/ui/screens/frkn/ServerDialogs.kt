@@ -64,8 +64,7 @@ internal fun EditServerDialog(
 @Composable
 internal fun AddServerDialog(
     onDismiss: () -> Unit,
-    onAddLink: (String) -> Unit,
-    onImportSubscription: (String) -> Unit
+    onAdd: (String) -> Unit
 ) {
     var text by remember { mutableStateOf("") }
     AlertDialog(
@@ -88,15 +87,12 @@ internal fun AddServerDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { if (text.isNotBlank()) onAddLink(text) },
+                onClick = { if (text.isNotBlank()) onAdd(text) },
                 enabled = text.isNotBlank()
-            ) { Text(stringResource(R.string.add_link)) }
+            ) { Text(stringResource(R.string.add)) }
         },
         dismissButton = {
-            TextButton(
-                onClick = { if (text.isNotBlank()) onImportSubscription(text) },
-                enabled = text.isNotBlank()
-            ) { Text(stringResource(R.string.import_subscription)) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

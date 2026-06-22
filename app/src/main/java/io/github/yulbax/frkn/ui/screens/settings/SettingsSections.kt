@@ -16,7 +16,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +33,7 @@ import io.github.yulbax.frkn.ui.components.DropdownSetting
 import io.github.yulbax.frkn.ui.components.GroupCard
 import io.github.yulbax.frkn.ui.components.SwitchRow
 import io.github.yulbax.frkn.ui.components.transparentFieldColors
+import io.github.yulbax.frkn.ui.viewmodel.SettingsUiState
 import io.github.yulbax.frkn.ui.viewmodel.SettingsViewModel
 import io.github.yulbax.frkn.util.Diagnostics
 import io.github.yulbax.frkn.vpn.core.Ipv6Mode
@@ -41,8 +41,8 @@ import io.github.yulbax.frkn.vpn.core.TlsFingerprint
 import io.github.yulbax.frkn.vpn.core.TunStack
 
 @Composable
-internal fun ByeDpiSection(viewModel: SettingsViewModel) {
-    val savedByeDpiArgs by viewModel.byeDpiArgs.collectAsState()
+internal fun ByeDpiSection(ui: SettingsUiState, viewModel: SettingsViewModel) {
+    val savedByeDpiArgs = ui.byeDpiArgs
     var text by remember { mutableStateOf(savedByeDpiArgs) }
     var focused by remember { mutableStateOf(false) }
     LaunchedEffect(savedByeDpiArgs) { if (!focused) text = savedByeDpiArgs }
@@ -82,9 +82,9 @@ internal fun ByeDpiSection(viewModel: SettingsViewModel) {
 }
 
 @Composable
-internal fun AutostartSection(viewModel: SettingsViewModel) {
+internal fun AutostartSection(ui: SettingsUiState, viewModel: SettingsViewModel) {
     val context = LocalContext.current
-    val autoConnect by viewModel.autoConnect.collectAsState()
+    val autoConnect = ui.autoConnect
 
     GroupCard(
         title = stringResource(R.string.autostart_title),
@@ -109,15 +109,15 @@ internal fun AutostartSection(viewModel: SettingsViewModel) {
 }
 
 @Composable
-internal fun NetworkSection(viewModel: SettingsViewModel) {
-    val tunStack by viewModel.tunStack.collectAsState()
-    val mtu by viewModel.mtu.collectAsState()
-    val ipv6Mode by viewModel.ipv6Mode.collectAsState()
-    val dnsRemote by viewModel.dnsRemote.collectAsState()
-    val dnsDirect by viewModel.dnsDirect.collectAsState()
-    val sniff by viewModel.sniff.collectAsState()
-    val bypassLan by viewModel.bypassLan.collectAsState()
-    val preferredFingerprint by viewModel.preferredFingerprint.collectAsState()
+internal fun NetworkSection(ui: SettingsUiState, viewModel: SettingsViewModel) {
+    val tunStack = ui.tunStack
+    val mtu = ui.mtu
+    val ipv6Mode = ui.ipv6Mode
+    val dnsRemote = ui.dnsRemote
+    val dnsDirect = ui.dnsDirect
+    val sniff = ui.sniff
+    val bypassLan = ui.bypassLan
+    val preferredFingerprint = ui.preferredFingerprint
     val fromConfigLabel = stringResource(R.string.fingerprint_from_config)
 
     GroupCard(

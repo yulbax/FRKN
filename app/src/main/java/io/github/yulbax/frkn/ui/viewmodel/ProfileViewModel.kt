@@ -12,28 +12,44 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+
+data class ServersUiState(
+    val profiles: List<ProfileEntity> = emptyList(),
+    val selected: ProfileEntity? = null,
+    val error: String? = null
+)
 
 class ProfileViewModel(
     private val application: Application,
     private val profileDao: ProfileDao
 ) : ViewModel() {
 
-    val profiles: StateFlow<List<ProfileEntity>> =
-        profileDao.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val selected: StateFlow<ProfileEntity?> =
-        profileDao.observeSelected().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
     private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+
+    val uiState: StateFlow<ServersUiState> = combine(
+        profileDao.observeAll(),
+        profileDao.observeSelected(),
+        _error
+    ) { profiles, selected, error -> ServersUiState(profiles, selected, error) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ServersUiState())
 
     fun clearError() {
         _error.value = null
+    }
+
+    fun add(raw: String) {
+        val input = raw.trim()
+        when {
+            LinkParser.parse(input) != null -> addLink(input)
+            input.startsWith("http://", ignoreCase = true) ||
+                input.startsWith("https://", ignoreCase = true) -> importSubscription(input)
+            else -> _error.value = application.getString(R.string.invalid_link_error)
+        }
     }
 
     fun addLink(link: String) {

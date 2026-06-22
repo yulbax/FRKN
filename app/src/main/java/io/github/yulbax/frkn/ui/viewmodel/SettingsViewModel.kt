@@ -29,27 +29,11 @@ class SettingsViewModel(
         .map { it ?: SettingsEntity() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsEntity())
 
-    val showSystemApps: StateFlow<Boolean> = settings
-        .map { it.showSystemApps }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    val byeDpiArgs: StateFlow<String> = settings
-        .map { it.byeDpiArgs }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
     val byeDpiArgsDefault: String = ByeDpi.DEFAULT_DESYNC_ARGS.joinToString(" ")
 
-    private val defaults = SettingsEntity()
-
-    val tunStack: StateFlow<TunStack> = field { TunStack.fromWire(it.tunStack) }
-    val mtu: StateFlow<Int> = field { it.mtu }
-    val ipv6Mode: StateFlow<Ipv6Mode> = field { Ipv6Mode.fromWire(it.ipv6Mode) }
-    val dnsRemote: StateFlow<String> = field { it.dnsRemote }
-    val dnsDirect: StateFlow<String> = field { it.dnsDirect }
-    val sniff: StateFlow<Boolean> = field { it.sniff }
-    val bypassLan: StateFlow<Boolean> = field { it.bypassLan }
-    val autoConnect: StateFlow<Boolean> = field { it.autoConnect }
-    val preferredFingerprint: StateFlow<TlsFingerprint?> = field { TlsFingerprint.fromWire(it.preferredFingerprint) }
+    val uiState: StateFlow<SettingsUiState> = settings
+        .map { it.toUiState() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsEntity().toUiState())
 
     fun toggleShowSystemApps() = update { it.copy(showSystemApps = !it.showSystemApps) }
     fun setByeDpiArgs(args: String) = update { it.copy(byeDpiArgs = args) }
@@ -76,11 +60,6 @@ class SettingsViewModel(
         }
     }
 
-    private fun <T> field(selector: (SettingsEntity) -> T): StateFlow<T> = settings
-        .map(selector)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), selector(defaults))
-
-
     private fun update(transform: (SettingsEntity) -> SettingsEntity) {
         viewModelScope.launch {
             val current = settingsDao.observeSettings().first() ?: SettingsEntity()
@@ -88,3 +67,31 @@ class SettingsViewModel(
         }
     }
 }
+
+data class SettingsUiState(
+    val showSystemApps: Boolean = false,
+    val byeDpiArgs: String = "",
+    val autoConnect: Boolean = false,
+    val tunStack: TunStack = TunStack.GVISOR,
+    val mtu: Int = 0,
+    val ipv6Mode: Ipv6Mode = Ipv6Mode.DISABLE,
+    val dnsRemote: String = "",
+    val dnsDirect: String = "",
+    val sniff: Boolean = false,
+    val bypassLan: Boolean = false,
+    val preferredFingerprint: TlsFingerprint? = null
+)
+
+private fun SettingsEntity.toUiState() = SettingsUiState(
+    showSystemApps = showSystemApps,
+    byeDpiArgs = byeDpiArgs,
+    autoConnect = autoConnect,
+    tunStack = TunStack.fromWire(tunStack),
+    mtu = mtu,
+    ipv6Mode = Ipv6Mode.fromWire(ipv6Mode),
+    dnsRemote = dnsRemote,
+    dnsDirect = dnsDirect,
+    sniff = sniff,
+    bypassLan = bypassLan,
+    preferredFingerprint = TlsFingerprint.fromWire(preferredFingerprint)
+)

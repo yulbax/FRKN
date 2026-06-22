@@ -83,7 +83,7 @@
     <string name="vpn_checking_connectivity">در حال بررسی اتصال</string>
     <string name="vpn_tap_to_disconnect">برای قطع بزنید</string>
     <string name="vpn_attempt">تلاش %1$d</string>
-    <string name="vpn_cycling_fingerprint">در حال تنظیم اتصال…</string>
+    <string name="vpn_cycling_fingerprint">در حال تنظیم…</string>
     <string name="vpn_cycling_fingerprint_sub">در حال آزمودن اثرانگشت‌های TLS… (%1$d)</string>
     <string name="toggle_connection_cd">تغییر وضعیت اتصال</string>
     <string name="channel_status_off">خاموش</string>
@@ -107,8 +107,7 @@
     <string name="add_server_cd">افزودن سرور</string>
     <string name="add_server_instructions">یک لینک اشتراک (vmess/vless/ss/trojan/hysteria2) یا آدرس اشتراک را بچسبانید.</string>
     <string name="link_or_subscription_url">لینک یا آدرس اشتراک</string>
-    <string name="add_link">افزودن لینک</string>
-    <string name="import_subscription">ورود اشتراک</string>
+    <string name="add">افزودن</string>
     <string name="share_server_chooser">اشتراک‌گذاری سرور</string>
     <string name="set_apps_snackbar">%1$d برنامه روی %2$s تنظیم شد</string>
     <string name="undo">واگرد</string>

@@ -22,7 +22,7 @@ import org.koin.androidx.compose.koinViewModel
 fun Settings(
     viewModel: SettingsViewModel = koinViewModel()
 ) {
-    val showSystemApps by viewModel.showSystemApps.collectAsState()
+    val ui by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -39,15 +39,15 @@ fun Settings(
         GroupCard(
             title = stringResource(R.string.applications),
             items = listOf {
-                SwitchRow(stringResource(R.string.show_system_apps), showSystemApps) {
+                SwitchRow(stringResource(R.string.show_system_apps), ui.showSystemApps) {
                     viewModel.toggleShowSystemApps()
                 }
             }
         )
 
-        ByeDpiSection(viewModel)
-        AutostartSection(viewModel)
-        NetworkSection(viewModel)
+        ByeDpiSection(ui, viewModel)
+        AutostartSection(ui, viewModel)
+        NetworkSection(ui, viewModel)
         BackupSection(viewModel)
     }
 }

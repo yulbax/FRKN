@@ -3,12 +3,12 @@ package io.github.yulbax.frkn.ui.screens.frkn
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,16 +55,14 @@ internal fun ConnectionCard(
 
     val targetTop = when {
         isError -> Color(0xFFB3261E)
-        cycling -> Color(0xFFF9A825)
-        connected -> Color(0xFF2E7D32)
         busy -> Color(0xFFF9A825)
+        connected -> Color(0xFF2E7D32)
         else -> scheme.surfaceVariant
     }
     val targetBottom = when {
         isError -> Color(0xFF8C1D18)
-        cycling -> Color(0xFFF57F17)
-        connected -> Color(0xFF1B5E20)
         busy -> Color(0xFFF57F17)
+        connected -> Color(0xFF1B5E20)
         else -> scheme.surface
     }
     val top by animateColorAsState(targetTop, tween(500), label = "top")
@@ -103,7 +102,13 @@ internal fun ConnectionCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.headlineMedium, color = content)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = content,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     subtitle,
@@ -137,31 +142,33 @@ private fun PowerToggle(
     content: Color,
     onToggle: () -> Unit
 ) {
-    val scheme = MaterialTheme.colorScheme
-    val circleColor = if (vivid) Color.White.copy(alpha = 0.2f) else scheme.primary
-    val iconColor = if (vivid) content else scheme.onPrimary
-    Box(
-        contentAlignment = Alignment.Center,
+    val circleColor = if (vivid) Color.White.copy(alpha = 0.2f) else Color.White
+    val iconColor = if (vivid) content else Color(0xFF1C1B1F)
+    Surface(
+        onClick = onToggle,
+        enabled = enabled,
+        shape = CircleShape,
+        color = circleColor,
+        shadowElevation = if (vivid) 0.dp else 4.dp,
         modifier = Modifier
             .size(80.dp)
-            .clip(CircleShape)
-            .background(circleColor)
-            .alpha(if (enabled) 1f else 0.4f)
-            .clickable(enabled = enabled, onClick = onToggle)
+            .alpha(if (enabled) 1f else 0.5f)
     ) {
-        if (busy) {
-            CircularProgressIndicator(
-                color = iconColor,
-                strokeWidth = 3.dp,
-                modifier = Modifier.size(32.dp)
-            )
-        } else {
-            Icon(
-                Icons.Default.PowerSettingsNew,
-                contentDescription = stringResource(R.string.toggle_connection_cd),
-                tint = iconColor,
-                modifier = Modifier.size(38.dp)
-            )
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            if (busy) {
+                CircularProgressIndicator(
+                    color = iconColor,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.size(32.dp)
+                )
+            } else {
+                Icon(
+                    Icons.Default.PowerSettingsNew,
+                    contentDescription = stringResource(R.string.toggle_connection_cd),
+                    tint = iconColor,
+                    modifier = Modifier.size(38.dp)
+                )
+            }
         }
     }
 }

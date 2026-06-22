@@ -83,7 +83,7 @@
     <string name="vpn_checking_connectivity">正在检查连接</string>
     <string name="vpn_tap_to_disconnect">点按以断开</string>
     <string name="vpn_attempt">第 %1$d 次尝试</string>
-    <string name="vpn_cycling_fingerprint">正在调整连接…</string>
+    <string name="vpn_cycling_fingerprint">正在调整…</string>
     <string name="vpn_cycling_fingerprint_sub">正在尝试 TLS 指纹，请稍候…（%1$d）</string>
     <string name="toggle_connection_cd">切换连接</string>
     <string name="channel_status_off">关闭</string>
@@ -107,8 +107,7 @@
     <string name="add_server_cd">添加服务器</string>
     <string name="add_server_instructions">粘贴分享链接（vmess/vless/ss/trojan/hysteria2）或订阅 URL。</string>
     <string name="link_or_subscription_url">链接或订阅 URL</string>
-    <string name="add_link">添加链接</string>
-    <string name="import_subscription">导入订阅</string>
+    <string name="add">添加</string>
     <string name="share_server_chooser">分享服务器</string>
     <string name="set_apps_snackbar">已将 %1$d 个应用设为 %2$s</string>
     <string name="undo">撤销</string>

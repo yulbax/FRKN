@@ -20,10 +20,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class FrknUiState(
+    val homeHintSeen: Boolean = true,
+    val hasRoutedApps: Boolean = false
+)
 
 class ConnectionViewModel(
     private val application: Application,
@@ -33,9 +39,16 @@ class ConnectionViewModel(
     private val commandBus: VpnCommandBus
 ) : ViewModel() {
 
-    val homeHintSeen: StateFlow<Boolean> = settingsDao.observeSettings()
-        .map { it?.homeHintSeen ?: false }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val uiState: StateFlow<FrknUiState> = combine(
+        settingsDao.observeSettings().map { it?.homeHintSeen ?: false },
+        appDao.getAllApps().map { apps ->
+            apps.any {
+                it.connectionType == ConnectionType.VPN ||
+                    it.connectionType == ConnectionType.BYEDPI
+            }
+        }
+    ) { homeHintSeen, hasRoutedApps -> FrknUiState(homeHintSeen, hasRoutedApps) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FrknUiState())
 
     fun dismissHomeHint() {
         viewModelScope.launch {
@@ -57,14 +70,6 @@ class ConnectionViewModel(
     private var testJob: Job? = null
     private val _byeDpiTest = MutableStateFlow(ByeDpiTestState())
     val byeDpiTest: StateFlow<ByeDpiTestState> = _byeDpiTest.asStateFlow()
-    val hasRoutedApps: StateFlow<Boolean> = appDao.getAllApps()
-        .map { apps ->
-            apps.any {
-                it.connectionType == ConnectionType.VPN ||
-                    it.connectionType == ConnectionType.BYEDPI
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun startVpn() {
         Telemetry.logVpnToggle(connect = true)

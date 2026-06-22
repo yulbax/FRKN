@@ -73,7 +73,7 @@ class AppSyncManager(
                         packageName = info.packageName,
                         name = name,
                         isSystemApp = isSystemApp,
-                        connectionType = getDefaultConnectionType(info.packageName, isSystemApp)
+                        connectionType = getDefaultConnectionType(info.packageName)
                     )
                 }
             }.awaitAll()
@@ -100,13 +100,13 @@ class AppSyncManager(
                 packageName = packageName,
                 name = name,
                 isSystemApp = isSystemApp,
-                connectionType = getDefaultConnectionType(packageName, isSystemApp)
+                connectionType = getDefaultConnectionType(packageName)
             ))
         } catch (_: Exception) {}
     }
 
-    private fun getDefaultConnectionType(packageName: String, isSystemApp: Boolean): ConnectionType {
-        return if (packageName.split('.').any { it.equals("ru", ignoreCase = true) } || isSystemApp) {
+    private fun getDefaultConnectionType(packageName: String): ConnectionType {
+        return if (packageName.split('.').any { it.equals("ru", ignoreCase = true) }) {
             ConnectionType.DIRECT
         } else {
             ConnectionType.VPN
