@@ -3,14 +3,12 @@ package io.github.yulbax.frkn.vpn
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager.NameNotFoundException
 import android.net.ConnectivityManager
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.os.SystemClock
-import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import io.github.yulbax.frkn.data.App
@@ -95,7 +93,7 @@ class FrknVpnService :
         super.onCreate()
         engine = SingBoxEngine(applicationContext, this, networkMonitor, this, frknLog)
         notification = VpnNotificationController(this, vpnStateRepository.stats)
-        health = HealthMonitor(vpnStateRepository)
+        health = HealthMonitor(vpnStateRepository, frknLog)
         commandLoop()
     }
 
@@ -220,12 +218,13 @@ class FrknVpnService :
         needed && byeDpi == null -> {
             val protectName =
                 "$packageName.byedpi-protect.${SystemClock.elapsedRealtimeNanos()}"
-            socketProtector = SocketProtector(protectName) { fd -> protect(fd) }
+            socketProtector = SocketProtector(protectName, frknLog) { fd -> protect(fd) }
                 .also { it.start() }
             byeDpi = ByeDpi(
                 port = byeDpiPort,
                 protectPath = protectName,
-                extraArgs = byeDpiArgs
+                extraArgs = byeDpiArgs,
+                onUnexpectedExit = { code -> frknLog.w(TAG, "byedpi exited unexpectedly code=$code") }
             ).also { it.start() }
             frknLog.i(TAG, "byedpi started on port $byeDpiPort args=$byeDpiArgs")
             vpnStateRepository.updateStats { it.copy(byeDpiPort = byeDpiPort) }
@@ -426,11 +425,7 @@ class FrknVpnService :
             builder.addRoute("::", 0)
             config.includePackages.forEach { runCatching { builder.addAllowedApplication(it) } }
             config.excludePackages.forEach {
-                try {
-                    builder.addDisallowedApplication(it)
-                } catch (e: NameNotFoundException) {
-                    Log.w(TAG, "exclude package not found", e)
-                }
+                runCatching { builder.addDisallowedApplication(it) }
             }
         }
 

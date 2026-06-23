@@ -1,5 +1,6 @@
 package io.github.yulbax.frkn.vpn
 
+import io.github.yulbax.frkn.util.FrknLog
 import io.github.yulbax.frkn.vpn.core.VpnEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -10,7 +11,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 
 class HealthMonitor(
-    private val stateRepository: VpnStateRepository
+    private val stateRepository: VpnStateRepository,
+    private val log: FrknLog
 ) {
     private var job: Job? = null
     private var vpnCountry: String = ""
@@ -32,6 +34,8 @@ class HealthMonitor(
         job = scope.launch {
             var failures = 0
             var wasByedpiUp = false
+            var prevVpnUp: Boolean? = null
+            var prevByedpiUp: Boolean? = null
             while (isActive) {
                 val (vpnDelay, newVpnCountry) =
                     probeChannel(
@@ -56,6 +60,21 @@ class HealthMonitor(
                 wasByedpiUp = byedpiUp
 
                 val byedpiActive = byeDpiPort != null
+
+                if (vpnActive && vpnUp != prevVpnUp) {
+                    if (vpnUp) {
+                        val country = if (vpnCountry.isNotEmpty()) " $vpnCountry" else ""
+                        log.i(TAG, "vpn channel up (${vpnDelay}ms$country)")
+                    } else {
+                        log.w(TAG, "vpn channel down")
+                    }
+                    prevVpnUp = vpnUp
+                }
+                if (byedpiActive && byedpiUp != prevByedpiUp) {
+                    if (byedpiUp) log.i(TAG, "byedpi channel up (${byedpiDelay}ms)")
+                    else log.w(TAG, "byedpi channel down")
+                    prevByedpiUp = byedpiUp
+                }
                 val anyUp = vpnUp || byedpiUp
                 val allActiveUp = (!vpnActive || vpnUp) && (!byedpiActive || byedpiUp)
                 val fpError = isFingerprintError()
@@ -118,6 +137,7 @@ class HealthMonitor(
     }
 
     companion object {
+        private const val TAG = "Health"
         private const val HEALTH_INTERVAL_MS = 15_000L
         private const val HEALTH_RETRY_MS = 3_000L
         private const val RELOAD_EVERY_N_FAILURES = 4

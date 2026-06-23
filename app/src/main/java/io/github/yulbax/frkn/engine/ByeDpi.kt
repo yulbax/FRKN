@@ -11,13 +11,16 @@ class ByeDpi(
     private val host: String = DEFAULT_HOST,
     private val port: Int = DEFAULT_PORT,
     private val protectPath: String? = null,
-    private val extraArgs: List<String> = DEFAULT_DESYNC_ARGS
+    private val extraArgs: List<String> = DEFAULT_DESYNC_ARGS,
+    private val onUnexpectedExit: ((Int) -> Unit)? = null
 ) {
     private val running = AtomicBoolean(false)
+    @Volatile private var stopRequested = false
     private var worker: Thread? = null
 
     fun start() {
         if (!running.compareAndSet(false, true)) return
+        stopRequested = false
         val args = buildList {
             add("ciadpi")
             add("-i"); add(host)
@@ -31,11 +34,13 @@ class ByeDpi(
             val code = nativeStart(args)
             Log.i(TAG, "byedpi exited with code $code")
             running.set(false)
+            if (!stopRequested) onUnexpectedExit?.invoke(code)
         }
     }
 
     fun stop() {
         if (!running.get()) return
+        stopRequested = true
         nativeStop()
         worker?.join(2000)
         worker = null

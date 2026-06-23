@@ -10,6 +10,7 @@ import androidx.work.WorkerParameters
 import io.github.yulbax.frkn.R
 import io.github.yulbax.frkn.data.AppDatabase
 import io.github.yulbax.frkn.data.SettingsEntity
+import io.github.yulbax.frkn.util.FrknLog
 import io.github.yulbax.frkn.util.createNotificationChannel
 import kotlinx.coroutines.flow.first
 import org.koin.core.component.KoinComponent
@@ -21,13 +22,22 @@ class ConnectWorker(
 ) : CoroutineWorker(context, params), KoinComponent {
 
     private val database: AppDatabase by inject()
+    private val log: FrknLog by inject()
 
     override suspend fun doWork(): Result {
         val settings = database.settingsDao().observeSettings().first() ?: SettingsEntity()
         val consentGranted = VpnService.prepare(applicationContext) == null
         val serverSelected = database.profileDao().getSelected() != null
         if (settings.autoConnect && serverSelected && consentGranted) {
+            log.i(TAG, "autostart: starting VPN")
             runCatching { FrknVpnService.start(applicationContext) }
+                .onFailure { log.e(TAG, "autostart: start failed", it) }
+        } else {
+            log.i(
+                TAG,
+                "autostart skipped: autoConnect=${settings.autoConnect} " +
+                    "serverSelected=$serverSelected consent=$consentGranted"
+            )
         }
         return Result.success()
     }
@@ -48,6 +58,7 @@ class ConnectWorker(
     }
 
     private companion object {
+        const val TAG = "Autostart"
         const val CHANNEL_ID = "frkn_autostart"
         const val NOTIFICATION_ID = 2
     }

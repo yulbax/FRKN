@@ -58,6 +58,6 @@ class FrknLog(context: Context) {
     }
 
     private companion object {
-        const val MAX_BYTES = 512 * 1024L
+        const val MAX_BYTES = 1024 * 1024L
     }
 }

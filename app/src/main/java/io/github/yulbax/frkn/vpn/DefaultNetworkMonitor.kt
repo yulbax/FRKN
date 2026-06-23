@@ -9,14 +9,20 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import io.github.yulbax.frkn.util.FrknLog
 import io.github.yulbax.frkn.vpn.core.DefaultInterfaceListener
 import java.net.NetworkInterface
 
-class DefaultNetworkMonitor(context: Context) {
+class DefaultNetworkMonitor(
+    context: Context,
+    private val log: FrknLog
+) {
 
     private val connectivity: ConnectivityManager =
         context.getSystemService(ConnectivityManager::class.java)
     private var listener: DefaultInterfaceListener? = null
+    private var lastInterfaceName = ""
+    private var lastInterfaceIndex = Int.MIN_VALUE
 
     @Volatile
     private var underlyingNetwork: Network? = null
@@ -32,6 +38,7 @@ class DefaultNetworkMonitor(context: Context) {
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
+            log.i(TAG, "network available (${transportOf(network)})")
             underlyingNetwork = network
             pushUpdate()
         }
@@ -42,8 +49,20 @@ class DefaultNetworkMonitor(context: Context) {
         }
 
         override fun onLost(network: Network) {
+            log.i(TAG, "network lost (${transportOf(network)})")
             if (network == underlyingNetwork) underlyingNetwork = null
             pushUpdate()
+        }
+    }
+
+    private fun transportOf(network: Network): String {
+        val caps = connectivity.getNetworkCapabilities(network) ?: return "unknown"
+        return when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "vpn"
+            else -> "other"
         }
     }
 
@@ -80,7 +99,7 @@ class DefaultNetworkMonitor(context: Context) {
         val l = listener ?: return
         val network = underlyingNetwork
         if (network == null) {
-            l.onDefaultInterfaceChanged("", -1)
+            emit(l, "", -1)
             return
         }
 
@@ -95,9 +114,24 @@ class DefaultNetworkMonitor(context: Context) {
                 Thread.sleep(100)
                 return@repeat
             }
-            l.onDefaultInterfaceChanged(name, index)
+            emit(l, name, index)
             return
         }
-        l.onDefaultInterfaceChanged("", -1)
+        log.w(TAG, "default interface unresolved — gave up")
+        emit(l, "", -1)
+    }
+
+    private fun emit(l: DefaultInterfaceListener, name: String, index: Int) {
+        if (name != lastInterfaceName || index != lastInterfaceIndex) {
+            lastInterfaceName = name
+            lastInterfaceIndex = index
+            if (index > 0) log.i(TAG, "default interface -> $name (idx=$index)")
+            else log.i(TAG, "default interface lost")
+        }
+        l.onDefaultInterfaceChanged(name, index)
+    }
+
+    private companion object {
+        const val TAG = "NetworkMonitor"
     }
 }

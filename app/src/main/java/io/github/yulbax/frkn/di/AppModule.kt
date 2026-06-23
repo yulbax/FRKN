@@ -24,11 +24,11 @@ val appModule = module {
     single { FrknLog(androidContext()) }
     single { VpnStateRepository() }
     single { VpnCommandBus() }
-    single { DefaultNetworkMonitor(androidContext()) }
+    single { DefaultNetworkMonitor(androidContext(), get()) }
     single(createdAtStart = true) { AppSyncManager(androidContext(), get()) }
 
     viewModel { AppsViewModel(androidApplication(), get(), get()) }
     viewModel { SettingsViewModel(androidApplication(), get(), get(), get()) }
-    viewModel { ProfileViewModel(androidApplication(), get()) }
+    viewModel { ProfileViewModel(androidApplication(), get(), get()) }
     viewModel { ConnectionViewModel(androidApplication(), get(), get(), get(), get()) }
 }

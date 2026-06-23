@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yulbax.frkn.R
+import io.github.yulbax.frkn.util.FrknLog
 import io.github.yulbax.frkn.util.LinkParser
 import io.github.yulbax.frkn.util.SubscriptionFetcher
 import io.github.yulbax.frkn.data.profile.ProfileDao
@@ -26,7 +27,8 @@ data class ServersUiState(
 
 class ProfileViewModel(
     private val application: Application,
-    private val profileDao: ProfileDao
+    private val profileDao: ProfileDao,
+    private val log: FrknLog
 ) : ViewModel() {
 
     private val _error = MutableStateFlow<String?>(null)
@@ -48,7 +50,10 @@ class ProfileViewModel(
             LinkParser.parse(input) != null -> addLink(input)
             input.startsWith("http://", ignoreCase = true) ||
                 input.startsWith("https://", ignoreCase = true) -> importSubscription(input)
-            else -> _error.value = application.getString(R.string.invalid_link_error)
+            else -> {
+                log.w(TAG, "add server: unsupported or invalid link")
+                _error.value = application.getString(R.string.invalid_link_error)
+            }
         }
     }
 
@@ -56,6 +61,7 @@ class ProfileViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val parsed = LinkParser.parse(link)
             if (parsed == null) {
+                log.w(TAG, "add server: link parse failed")
                 _error.value = application.getString(R.string.invalid_link_error)
                 return@launch
             }
@@ -75,13 +81,16 @@ class ProfileViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val parsedList = runCatching { SubscriptionFetcher.fetch(url.trim()) }
                 .getOrElse {
+                    log.w(TAG, "subscription fetch failed", it)
                     _error.value = application.getString(R.string.fetch_subscription_failed, it.message)
                     return@launch
                 }
             if (parsedList.isEmpty()) {
+                log.w(TAG, "subscription returned no servers")
                 _error.value = application.getString(R.string.no_servers_in_subscription)
                 return@launch
             }
+            log.i(TAG, "subscription imported ${parsedList.size} servers")
             var firstId = -1L
             for (parsed in parsedList) {
                 val id = profileDao.insert(
@@ -105,6 +114,7 @@ class ProfileViewModel(
             if (trimmedLink.isNotEmpty() && trimmedLink != profile.link) {
                 val parsed = LinkParser.parse(trimmedLink)
                 if (parsed == null) {
+                    log.w(TAG, "edit server: link parse failed")
                     _error.value = application.getString(R.string.invalid_link_error)
                     return@launch
                 }
@@ -127,10 +137,12 @@ class ProfileViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val parsedList = runCatching { SubscriptionFetcher.fetch(url) }
                 .getOrElse {
+                    log.w(TAG, "subscription refresh failed", it)
                     _error.value = application.getString(R.string.fetch_subscription_failed, it.message)
                     return@launch
                 }
             if (parsedList.isEmpty()) {
+                log.w(TAG, "subscription refresh returned no servers")
                 _error.value = application.getString(R.string.no_servers_in_subscription)
                 return@launch
             }
@@ -151,5 +163,9 @@ class ProfileViewModel(
 
     fun delete(profile: ProfileEntity) {
         viewModelScope.launch(Dispatchers.IO) { profileDao.delete(profile) }
+    }
+
+    private companion object {
+        const val TAG = "Servers"
     }
 }

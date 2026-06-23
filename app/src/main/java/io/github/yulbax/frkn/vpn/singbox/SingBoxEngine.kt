@@ -71,7 +71,6 @@ class SingBoxEngine(
     }
 
     override fun reloadRouting(config: EngineConfig) {
-        runCatching { boxLogFile.takeIf { it.exists() }?.writeText("") }
         commandServer?.startOrReloadService(buildConfig(config), OverrideOptions())
     }
 

@@ -3,17 +3,19 @@ package io.github.yulbax.frkn.vpn
 import android.annotation.SuppressLint
 import android.net.LocalServerSocket
 import android.net.LocalSocket
-import android.util.Log
+import io.github.yulbax.frkn.util.FrknLog
 import java.io.FileDescriptor
 import kotlin.concurrent.thread
 
 class SocketProtector(
     val name: String,
+    private val log: FrknLog,
     private val protect: (Int) -> Boolean
 ) {
     private var serverSocket: LocalServerSocket? = null
     private var worker: Thread? = null
     @Volatile private var running = false
+    @Volatile private var loggedFailure = false
 
     fun start() {
         if (running) return
@@ -42,16 +44,22 @@ class SocketProtector(
                 fds.forEach { runCatching { closeFd(it) } }
                 result
             } else {
-                Log.w(TAG, "no ancillary fds received")
+                logFailureOnce("no ancillary fds received", null)
                 false
             }
             socket.outputStream.write(if (ok) 0 else 1)
             socket.outputStream.flush()
         } catch (e: Exception) {
-            Log.w(TAG, "protect handling failed", e)
+            logFailureOnce("protect handling failed", e)
         } finally {
             runCatching { socket.close() }
         }
+    }
+
+    private fun logFailureOnce(message: String, t: Throwable?) {
+        if (loggedFailure) return
+        loggedFailure = true
+        log.w(TAG, "$message (further occurrences suppressed)", t)
     }
 
     fun stop() {

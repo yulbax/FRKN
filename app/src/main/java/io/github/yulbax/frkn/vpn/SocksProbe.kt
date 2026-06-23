@@ -1,6 +1,5 @@
 package io.github.yulbax.frkn.vpn
 
-import android.util.Log
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.ProxyBuilder
 import io.ktor.client.engine.android.Android
@@ -13,7 +12,6 @@ import java.net.PasswordAuthentication
 import java.util.concurrent.atomic.AtomicReference
 
 object SocksProbe {
-    private const val TAG = "SocksProbe"
     private const val GEO_URL = "https://api.country.is/"
     private const val PROBE_TIMEOUT_MS = 6_000
     private val COUNTRY_REGEX = Regex("\"country\"\\s*:\\s*\"([A-Za-z]{2})\"")
@@ -33,7 +31,6 @@ object SocksProbe {
                 if (response.status.value in 200..399) {
                     (System.currentTimeMillis() - start).toInt().coerceAtLeast(1)
                 } else {
-                    Log.w(TAG, "probe http ${response.status.value} ($url port=$socksPort)")
                     null
                 }
             }
@@ -64,8 +61,7 @@ object SocksProbe {
                     socketTimeout = PROBE_TIMEOUT_MS
                 }
             }.use { client -> block(client) }
-        } catch (t: Throwable) {
-            Log.w(TAG, "probe failed (port=$port auth=$useAuth): ${t.javaClass.simpleName}: ${t.message}")
+        } catch (_: Throwable) {
             null
         } finally {
             if (useAuth) proxyCredentials.set(null)
