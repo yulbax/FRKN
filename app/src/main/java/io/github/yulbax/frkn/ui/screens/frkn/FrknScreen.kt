@@ -10,7 +10,13 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -273,19 +279,15 @@ fun FrknScreen(
                             )
                         }
                     }
-                    if (showTest) {
-                        SpeedometerButton(
-                            onClick = {
-                                if (!testingLatency) {
-                                    profileViewModel.testAll()
-                                    testingLatency = true
-                                }
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 12.dp)
-                        )
-                    }
+                    AnimatedSpeedometerButton(
+                        visible = showTest,
+                        onClick = {
+                            if (!testingLatency) {
+                                profileViewModel.testAll()
+                                testingLatency = true
+                            }
+                        }
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -319,6 +321,20 @@ fun FrknScreen(
             title = { Text(stringResource(R.string.dialog_error)) },
             text = { Text(message) }
         )
+    }
+}
+
+@Composable
+private fun BoxScope.AnimatedSpeedometerButton(visible: Boolean, onClick: () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically { it * 2 } + fadeIn(),
+        exit = slideOutVertically { it * 2 } + fadeOut(),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 12.dp)
+    ) {
+        SpeedometerButton(onClick = onClick)
     }
 }
 
