@@ -156,12 +156,26 @@ release:
   rules:
     - if: $CI_COMMIT_TAG
   needs: ["upload:apk"]
+  variables:
+    GIT_DEPTH: 0                 # full history + tags, needed for the changelog
   script:
-    - echo "Creating GitLab Release for ${CI_COMMIT_TAG}"
+    - apk add --no-cache git
+    - |
+      PREV="$(git tag --sort=-creatordate | grep -v "^${CI_COMMIT_TAG}$" | head -n1)"
+      {
+        if [ -n "$PREV" ]; then
+          echo "Changes since ${PREV}:"; echo
+          git log --no-merges --pretty='- %s (%h)' "${PREV}..${CI_COMMIT_TAG}"
+        else
+          echo "Initial release."; echo
+          git log --no-merges --pretty='- %s (%h)'
+        fi
+      } > release_notes.md
+    - cat release_notes.md
   release:
     tag_name: "${CI_COMMIT_TAG}"
     name: "FRKN ${CI_COMMIT_TAG}"
-    description: "Automated FOSS release build for ${CI_COMMIT_TAG}."
+    description: release_notes.md
     assets:
       links:
         - name: "frkn-${CI_COMMIT_TAG}-arm64-v8a.apk"

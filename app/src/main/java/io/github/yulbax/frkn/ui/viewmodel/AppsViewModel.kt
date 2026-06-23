@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.koin.android.annotation.KoinViewModel
 
 data class AppInfo(
     val packageName: String,
@@ -32,6 +33,7 @@ data class AppInfo(
     val connectionType: ConnectionType = ConnectionType.VPN
 )
 
+@KoinViewModel
 class AppsViewModel(
     private val application: Application,
     private val appDao: AppDao,

@@ -10,6 +10,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,9 +23,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -44,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import io.github.yulbax.frkn.R
 import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.profile.ProfileEntity
@@ -53,6 +57,7 @@ import io.github.yulbax.frkn.ui.viewmodel.ConnectionViewModel
 import io.github.yulbax.frkn.ui.viewmodel.ProfileViewModel
 import io.github.yulbax.frkn.vpn.VpnState
 import org.koin.androidx.compose.koinViewModel
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun FrknScreen(
@@ -69,7 +74,18 @@ fun FrknScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<ProfileEntity?>(null) }
     var showByeDpiDialog by remember { mutableStateOf(false) }
+    var testingLatency by remember { mutableStateOf(false) }
     val byeDpiTest by viewModel.byeDpiTest.collectAsState()
+
+    LaunchedEffect(servers.delays) {
+        if (testingLatency) testingLatency = false
+    }
+    LaunchedEffect(testingLatency) {
+        if (testingLatency) {
+            delay(10000.milliseconds)
+            testingLatency = false
+        }
+    }
 
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -165,7 +181,9 @@ fun FrknScreen(
                 reachable = stats.byedpiReachable,
                 total = stats.byedpiTotal,
                 checking = stats.byedpiChecking,
-                onClick = { showByeDpiDialog = true }
+                onClick = if (stats.byedpiActive && stats.byedpiUp) {
+                    { showByeDpiDialog = true }
+                } else null
             )
         }
 
@@ -222,23 +240,50 @@ fun FrknScreen(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    items(servers.profiles, key = { it.id }) { profile ->
-                        ServerRow(
-                            profile = profile,
-                            isSelected = profile.id == servers.selected?.id,
-                            onSelect = { profileViewModel.select(profile) },
-                            onEdit = { editing = profile },
-                            onShare = {
-                                val shareLink = profile.subscriptionUrl.ifEmpty { profile.link }
-                                shareServerLink(context, shareLink)
+                val showTest = connected && servers.profiles.size > 1
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 6.dp,
+                            end = 6.dp,
+                            top = 6.dp,
+                            bottom = if (showTest) 64.dp else 6.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val fastestId = servers.delays
+                            .filterValues { it > 0 }
+                            .minByOrNull { it.value }
+                            ?.key
+                        items(servers.profiles, key = { it.id }) { profile ->
+                            ServerRow(
+                                profile = profile,
+                                isSelected = profile.id == servers.selected?.id,
+                                delayMs = servers.delays[profile.id],
+                                isBest = profile.id == fastestId,
+                                onSelect = { profileViewModel.select(profile) },
+                                onEdit = { editing = profile },
+                                onShare = {
+                                    val shareLink = profile.subscriptionUrl.ifEmpty { profile.link }
+                                    shareServerLink(context, shareLink)
+                                },
+                                onRefresh = { profileViewModel.refreshSubscription(profile) },
+                                onDelete = { profileViewModel.delete(profile) }
+                            )
+                        }
+                    }
+                    if (showTest) {
+                        SpeedometerButton(
+                            onClick = {
+                                if (!testingLatency) {
+                                    profileViewModel.testAll()
+                                    testingLatency = true
+                                }
                             },
-                            onRefresh = { profileViewModel.refreshSubscription(profile) },
-                            onDelete = { profileViewModel.delete(profile) }
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 12.dp)
                         )
                     }
                 }
@@ -274,6 +319,25 @@ fun FrknScreen(
             title = { Text(stringResource(R.string.dialog_error)) },
             text = { Text(message) }
         )
+    }
+}
+
+@Composable
+private fun SpeedometerButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = modifier.size(44.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Default.Speed,
+                contentDescription = stringResource(R.string.server_test_latency),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }
 

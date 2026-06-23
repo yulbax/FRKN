@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.koin.android.annotation.KoinViewModel
 
 data class FrknUiState(
     val homeHintSeen: Boolean = true,
@@ -33,6 +34,7 @@ data class FrknUiState(
     val hasByedpiApps: Boolean = false
 )
 
+@KoinViewModel
 class ConnectionViewModel(
     private val application: Application,
     vpnStateRepository: VpnStateRepository,

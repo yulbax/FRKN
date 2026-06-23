@@ -1,10 +1,12 @@
 package io.github.yulbax.frkn.ui.screens.frkn
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,7 +23,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
@@ -33,7 +34,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,6 +47,8 @@ import io.github.yulbax.frkn.data.profile.ProfileEntity
 internal fun ServerRow(
     profile: ProfileEntity,
     isSelected: Boolean,
+    delayMs: Int? = null,
+    isBest: Boolean = false,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
@@ -58,23 +63,35 @@ internal fun ServerRow(
         disabledContainerColor = MaterialTheme.colorScheme.onSurface
     )
 
+    val pingColor = delayMs?.let { pingColor(it) }
+    val rowColor = when {
+        isBest && pingColor != null -> pingColor.copy(alpha = 0.14f)
+        isSelected -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+        else -> Color.Transparent
+    }
+
     Surface(
         onClick = onSelect,
         shape = RoundedCornerShape(18.dp),
-        color = if (isSelected) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            Color.Transparent
-        },
+        color = rowColor,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 8.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+                .padding(start = 8.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RadioButton(selected = isSelected, onClick = onSelect)
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                    )
+            )
+            Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     profile.name.ifEmpty { stringResource(R.string.unnamed_profile) },
@@ -101,6 +118,18 @@ internal fun ServerRow(
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
+                    }
+                    if (delayMs != null && pingColor != null) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (delayMs <= 0) {
+                                stringResource(R.string.server_ping_timeout)
+                            } else {
+                                "$delayMs ms"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = pingColor
+                        )
                     }
                 }
             }
@@ -169,4 +198,16 @@ internal fun ServerRow(
             )
         }
     }
+}
+
+private val PING_GREEN = Color(0xFF4CAF50)
+private val PING_YELLOW = Color(0xFFFFC107)
+private val PING_RED = Color(0xFFE53935)
+
+private fun pingColor(delayMs: Int): Color = when {
+    delayMs <= 0 -> PING_RED
+    delayMs <= 100 -> PING_GREEN
+    delayMs < 450 -> lerp(PING_GREEN, PING_YELLOW, (delayMs - 100) / 350f)
+    delayMs < 900 -> lerp(PING_YELLOW, PING_RED, (delayMs - 450) / 450f)
+    else -> PING_RED
 }

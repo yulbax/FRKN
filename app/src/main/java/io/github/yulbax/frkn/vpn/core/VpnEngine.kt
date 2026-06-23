@@ -11,6 +11,8 @@ interface VpnEngine {
 
     fun selectProxy(tag: String): Boolean
 
+    fun testProxies()
+
     fun hasFingerprintError(): Boolean
 
     fun stop()
@@ -18,6 +20,7 @@ interface VpnEngine {
 
 interface EngineListener {
     fun onThroughput(uplinkBytesPerSec: Long, downlinkBytesPerSec: Long)
+    fun onProxyDelays(delays: Map<String, Int>)
     fun onStopRequested()
 }
 

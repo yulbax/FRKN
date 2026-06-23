@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.Authenticator
 import java.net.PasswordAuthentication
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 object SocksProbe {
@@ -16,6 +17,7 @@ object SocksProbe {
     private const val PROBE_TIMEOUT_MS = 6_000
     private val COUNTRY_REGEX = Regex("\"country\"\\s*:\\s*\"([A-Za-z]{2})\"")
     private val proxyCredentials = AtomicReference<PasswordAuthentication?>(null)
+    private val clients = ConcurrentHashMap<Int, HttpClient>()
 
     init {
         Authenticator.setDefault(object : Authenticator() {
@@ -44,6 +46,22 @@ object SocksProbe {
             }
         }
 
+    fun close() {
+        clients.values.forEach { runCatching { it.close() } }
+        clients.clear()
+    }
+
+    private fun clientFor(port: Int): HttpClient = clients.getOrPut(port) {
+        HttpClient(Android) {
+            expectSuccess = false
+            engine {
+                proxy = ProxyBuilder.socks("127.0.0.1", port)
+                connectTimeout = PROBE_TIMEOUT_MS
+                socketTimeout = PROBE_TIMEOUT_MS
+            }
+        }
+    }
+
     private suspend fun <T> withClient(
         port: Int,
         username: String?,
@@ -53,14 +71,7 @@ object SocksProbe {
         val useAuth = username != null && password != null
         if (useAuth) proxyCredentials.set(PasswordAuthentication(username, password.toCharArray()))
         return try {
-            HttpClient(Android) {
-                expectSuccess = false
-                engine {
-                    proxy = ProxyBuilder.socks("127.0.0.1", port)
-                    connectTimeout = PROBE_TIMEOUT_MS
-                    socketTimeout = PROBE_TIMEOUT_MS
-                }
-            }.use { client -> block(client) }
+            block(clientFor(port))
         } catch (_: Throwable) {
             null
         } finally {

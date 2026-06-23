@@ -84,6 +84,11 @@ class SingBoxEngine(
         Libbox.newStandaloneCommandClient().selectOutbound(ConfigBuilder.PROXY_GROUP_TAG, tag)
     }.isSuccess
 
+    override fun testProxies() {
+        runCatching { commandClient?.urlTest(ConfigBuilder.PROXY_GROUP_TAG) }
+            .onFailure { log.w(TAG, "urlTest failed", it) }
+    }
+
     override fun stop() {
         runCatching { commandClient?.disconnect() }
         commandClient = null
@@ -111,7 +116,24 @@ class SingBoxEngine(
             listener.onThroughput(status.uplink, status.downlink)
         }
 
-        override fun writeGroups(groups: OutboundGroupIterator) {}
+        override fun writeGroups(groups: OutboundGroupIterator) {
+            val delays = mutableMapOf<String, Int>()
+            while (groups.hasNext()) {
+                val group = groups.next()
+                if (group.tag != ConfigBuilder.PROXY_GROUP_TAG) continue
+                val items = group.items
+                while (items.hasNext()) {
+                    val item = items.next()
+                    when {
+                        item.urlTestTime <= 0L -> Unit
+                        item.urlTestDelay <= 0 -> delays[item.tag] = DELAY_FAILED
+                        else -> delays[item.tag] = item.urlTestDelay
+                    }
+                }
+            }
+            listener.onProxyDelays(delays)
+        }
+
         override fun connected() {}
         override fun disconnected(message: String) {}
         override fun clearLogs() {}
@@ -126,10 +148,14 @@ class SingBoxEngine(
         val options = CommandClientOptions().apply {
             statusInterval = 1_000_000_000L
             addCommand(Libbox.CommandStatus)
+            addCommand(Libbox.CommandGroup)
         }
         val client = Libbox.newCommandClient(clientHandler, options)
         runCatching { client.connect() }
-            .onSuccess { commandClient = client }
+            .onSuccess {
+                commandClient = client
+                runCatching { client.setGroupExpand(ConfigBuilder.PROXY_GROUP_TAG, true) }
+            }
             .onFailure { log.e(TAG, "command client connect failed", it) }
     }
 
@@ -209,6 +235,7 @@ class SingBoxEngine(
 
     private companion object {
         const val TAG = "SingBoxEngine"
+        const val DELAY_FAILED = -1
 
         fun randomToken(): String {
             val bytes = ByteArray(12)

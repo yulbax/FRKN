@@ -19,7 +19,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.1.7"
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -84,6 +84,11 @@ android {
 
 }
 
+ksp {
+    arg("KOIN_CONFIG_CHECK", "true")
+    arg("KOIN_DEFAULT_MODULE", "false")
+}
+
 val renameReleaseApks = tasks.register("renameReleaseApks") {
     val apkDir = layout.buildDirectory.dir("outputs/apk/release")
     val version = android.defaultConfig.versionName
@@ -117,6 +122,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
 
     implementation(libs.koin.androidx.compose)
+    implementation(libs.koin.annotations)
+    ksp(libs.koin.ksp.compiler)
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)

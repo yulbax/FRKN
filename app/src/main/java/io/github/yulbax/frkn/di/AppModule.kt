@@ -1,34 +1,26 @@
 package io.github.yulbax.frkn.di
 
+import android.content.Context
+import io.github.yulbax.frkn.data.AppDao
 import io.github.yulbax.frkn.data.AppDatabase
-import io.github.yulbax.frkn.ui.viewmodel.AppsViewModel
-import io.github.yulbax.frkn.ui.viewmodel.ConnectionViewModel
-import io.github.yulbax.frkn.ui.viewmodel.ProfileViewModel
-import io.github.yulbax.frkn.ui.viewmodel.SettingsViewModel
-import io.github.yulbax.frkn.util.AppSyncManager
-import io.github.yulbax.frkn.util.FrknLog
-import io.github.yulbax.frkn.vpn.DefaultNetworkMonitor
-import io.github.yulbax.frkn.vpn.VpnCommandBus
-import io.github.yulbax.frkn.vpn.VpnStateRepository
-import org.koin.android.ext.koin.androidApplication
-import org.koin.android.ext.koin.androidContext
-import org.koin.core.module.dsl.viewModel
-import org.koin.dsl.module
+import io.github.yulbax.frkn.data.SettingsDao
+import io.github.yulbax.frkn.data.profile.ProfileDao
+import org.koin.core.annotation.ComponentScan
+import org.koin.core.annotation.Module
+import org.koin.core.annotation.Single
 
-val appModule = module {
-    single { AppDatabase.build(androidContext()) }
-    single { get<AppDatabase>().appDao() }
-    single { get<AppDatabase>().settingsDao() }
-    single { get<AppDatabase>().profileDao() }
+@Module
+@ComponentScan("io.github.yulbax.frkn")
+class AppModule {
+    @Single
+    fun database(context: Context): AppDatabase = AppDatabase.build(context)
 
-    single { FrknLog(androidContext()) }
-    single { VpnStateRepository() }
-    single { VpnCommandBus() }
-    single { DefaultNetworkMonitor(androidContext(), get()) }
-    single(createdAtStart = true) { AppSyncManager(androidContext(), get()) }
+    @Single
+    fun appDao(database: AppDatabase): AppDao = database.appDao()
 
-    viewModel { AppsViewModel(androidApplication(), get(), get()) }
-    viewModel { SettingsViewModel(androidApplication(), get(), get(), get()) }
-    viewModel { ProfileViewModel(androidApplication(), get(), get()) }
-    viewModel { ConnectionViewModel(androidApplication(), get(), get(), get(), get()) }
+    @Single
+    fun settingsDao(database: AppDatabase): SettingsDao = database.settingsDao()
+
+    @Single
+    fun profileDao(database: AppDatabase): ProfileDao = database.profileDao()
 }

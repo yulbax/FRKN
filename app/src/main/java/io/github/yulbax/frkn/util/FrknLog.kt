@@ -2,11 +2,13 @@ package io.github.yulbax.frkn.util
 
 import android.content.Context
 import android.util.Log
+import org.koin.core.annotation.Single
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@Single
 class FrknLog(context: Context) {
 
     private val logFile = File(context.applicationContext.filesDir, "frkn.log")

@@ -10,6 +10,16 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 
+data class HealthParams(
+    val engine: VpnEngine,
+    val byeDpiPort: Int?,
+    val vpnActive: Boolean,
+    val onRefreshSubscription: suspend () -> Unit,
+    val onRecoveryReload: suspend () -> Unit,
+    val onByedpiUp: suspend () -> Unit,
+    val isFingerprintError: () -> Boolean
+)
+
 class HealthMonitor(
     private val stateRepository: VpnStateRepository,
     private val log: FrknLog
@@ -18,16 +28,14 @@ class HealthMonitor(
     private var vpnCountry: String = ""
     private var byedpiCountry: String = ""
 
-    fun start(
-        scope: CoroutineScope,
-        engine: VpnEngine,
-        byeDpiPort: Int?,
-        vpnActive: Boolean,
-        onRefreshSubscription: suspend () -> Unit,
-        onRecoveryReload: suspend () -> Unit,
-        onByedpiUp: suspend () -> Unit,
-        isFingerprintError: () -> Boolean
-    ) {
+    fun start(scope: CoroutineScope, params: HealthParams) {
+        val engine = params.engine
+        val byeDpiPort = params.byeDpiPort
+        val vpnActive = params.vpnActive
+        val onRefreshSubscription = params.onRefreshSubscription
+        val onRecoveryReload = params.onRecoveryReload
+        val onByedpiUp = params.onByedpiUp
+        val isFingerprintError = params.isFingerprintError
         job?.cancel()
         vpnCountry = ""
         byedpiCountry = ""
@@ -118,6 +126,7 @@ class HealthMonitor(
     fun stop() {
         job?.cancel()
         job = null
+        SocksProbe.close()
     }
 
     private suspend fun probeChannel(

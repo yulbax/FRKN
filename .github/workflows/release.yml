@@ -124,13 +124,34 @@ jobs:
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0          # full history + tags, needed for the changelog
       - uses: actions/download-artifact@v4
         with:
           name: apks
           path: apks
+      - name: Generate changelog
+        run: |
+          VERSION="${{ needs.check.outputs.version }}"
+          # The v$VERSION tag doesn't exist yet (softprops creates it below), so the
+          # newest existing tag is the previous release.
+          PREV="$(git tag --sort=-creatordate | grep -v "^v${VERSION}$" | head -n1)"
+          {
+            if [ -n "$PREV" ]; then
+              echo "**Changes since ${PREV}:**"
+              echo
+              git log --no-merges --pretty='- %s (%h)' "${PREV}..HEAD"
+            else
+              echo "**Initial release.**"
+              echo
+              git log --no-merges --pretty='- %s (%h)'
+            fi
+          } > CHANGELOG.md
+          cat CHANGELOG.md
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ needs.check.outputs.version }}"
           name: "FRKN v${{ needs.check.outputs.version }}"
-          body: "Automated FOSS release build for v${{ needs.check.outputs.version }}."
+          body_path: CHANGELOG.md
           files: apks/*.apk

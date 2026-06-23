@@ -11,8 +11,10 @@ import android.os.Handler
 import android.os.HandlerThread
 import io.github.yulbax.frkn.util.FrknLog
 import io.github.yulbax.frkn.vpn.core.DefaultInterfaceListener
+import org.koin.core.annotation.Single
 import java.net.NetworkInterface
 
+@Single
 class DefaultNetworkMonitor(
     context: Context,
     private val log: FrknLog
@@ -23,6 +25,9 @@ class DefaultNetworkMonitor(
     private var listener: DefaultInterfaceListener? = null
     private var lastInterfaceName = ""
     private var lastInterfaceIndex = Int.MIN_VALUE
+
+    var onUnderlyingNetworkChanged: ((Network?) -> Unit)? = null
+    private var reportedNetwork: Network? = null
 
     @Volatile
     private var underlyingNetwork: Network? = null
@@ -40,18 +45,29 @@ class DefaultNetworkMonitor(
         override fun onAvailable(network: Network) {
             log.i(TAG, "network available (${transportOf(network)})")
             underlyingNetwork = network
+            reportNetwork()
             pushUpdate()
         }
 
         override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
             underlyingNetwork = network
+            reportNetwork()
             pushUpdate()
         }
 
         override fun onLost(network: Network) {
             log.i(TAG, "network lost (${transportOf(network)})")
             if (network == underlyingNetwork) underlyingNetwork = null
+            reportNetwork()
             pushUpdate()
+        }
+    }
+
+    private fun reportNetwork() {
+        val network = underlyingNetwork
+        if (network != reportedNetwork) {
+            reportedNetwork = network
+            onUnderlyingNetworkChanged?.invoke(network)
         }
     }
 
@@ -88,6 +104,7 @@ class DefaultNetworkMonitor(
             registered = false
         }
         underlyingNetwork = null
+        reportedNetwork = null
     }
 
     fun setListener(newListener: DefaultInterfaceListener?) {

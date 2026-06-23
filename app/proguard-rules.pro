@@ -7,27 +7,27 @@
 # from native Go via JNI; their method names/signatures must survive. The vpn
 # package is small, so keep it wholesale (covers FrknVpnService, FrknPlatformInterface,
 # DefaultNetworkMonitor, SocketProtector, StringArray, ConfigBuilder, …).
--keep class cz.cvut.fit.abdulafz.frkn.vpn.** { *; }
+-keep class io.github.yulbax.frkn.vpn.** { *; }
 
 # ───────────────────────── byedpi (JNI, name-based lookup) ─────────────────────────
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }
--keep class cz.cvut.fit.abdulafz.frkn.engine.ByeDpi { *; }
+-keep class io.github.yulbax.frkn.engine.ByeDpi { *; }
 
 # ───────────────────────── kotlinx.serialization ─────────────────────────
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.**
 -keepclassmembers class **$$serializer { *; }
--keep,includedescriptorclasses class cz.cvut.fit.abdulafz.frkn.**$$serializer { *; }
--keepclassmembers class cz.cvut.fit.abdulafz.frkn.** {
+-keep,includedescriptorclasses class io.github.yulbax.frkn.**$$serializer { *; }
+-keepclassmembers class io.github.yulbax.frkn.** {
     *** Companion;
     kotlinx.serialization.KSerializer serializer(...);
 }
 
 # ───────────────────────── Room ─────────────────────────
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
--keep @androidx.room.Entity class cz.cvut.fit.abdulafz.frkn.** { *; }
+-keep @androidx.room.Entity class io.github.yulbax.frkn.** { *; }
 -dontwarn androidx.room.paging.**
 
 # ───────────────────────── Ktor (engine resolved via reflection/ServiceLoader) ─────────────────────────

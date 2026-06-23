@@ -16,7 +16,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.core.annotation.Single
 
+@Single(createdAtStart = true)
 class AppSyncManager(
     private val context: Context,
     private val appDao: AppDao

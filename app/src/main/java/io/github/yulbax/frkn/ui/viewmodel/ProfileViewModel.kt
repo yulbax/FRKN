@@ -9,6 +9,8 @@ import io.github.yulbax.frkn.util.LinkParser
 import io.github.yulbax.frkn.util.SubscriptionFetcher
 import io.github.yulbax.frkn.data.profile.ProfileDao
 import io.github.yulbax.frkn.data.profile.ProfileEntity
+import io.github.yulbax.frkn.vpn.VpnCommandBus
+import io.github.yulbax.frkn.vpn.VpnStateRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,16 +20,21 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import org.koin.android.annotation.KoinViewModel
 
 data class ServersUiState(
     val profiles: List<ProfileEntity> = emptyList(),
     val selected: ProfileEntity? = null,
+    val delays: Map<Long, Int> = emptyMap(),
     val error: String? = null
 )
 
+@KoinViewModel
 class ProfileViewModel(
     private val application: Application,
     private val profileDao: ProfileDao,
+    private val stateRepository: VpnStateRepository,
+    private val commandBus: VpnCommandBus,
     private val log: FrknLog
 ) : ViewModel() {
 
@@ -36,9 +43,15 @@ class ProfileViewModel(
     val uiState: StateFlow<ServersUiState> = combine(
         profileDao.observeAll(),
         profileDao.observeSelected(),
+        stateRepository.proxyDelays,
         _error
-    ) { profiles, selected, error -> ServersUiState(profiles, selected, error) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ServersUiState())
+    ) { profiles, selected, delays, error ->
+        ServersUiState(profiles, selected, delays.toProfileDelays(), error)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ServersUiState())
+
+    fun testAll() {
+        commandBus.testProxies()
+    }
 
     fun clearError() {
         _error.value = null
@@ -164,6 +177,11 @@ class ProfileViewModel(
     fun delete(profile: ProfileEntity) {
         viewModelScope.launch(Dispatchers.IO) { profileDao.delete(profile) }
     }
+
+    private fun Map<String, Int>.toProfileDelays(): Map<Long, Int> =
+        mapNotNull { (tag, delay) ->
+            tag.removePrefix("p").toLongOrNull()?.let { it to delay }
+        }.toMap()
 
     private companion object {
         const val TAG = "Servers"

@@ -94,6 +94,9 @@ class FrknVpnService :
         engine = SingBoxEngine(applicationContext, this, networkMonitor, this, frknLog)
         notification = VpnNotificationController(this, vpnStateRepository.stats)
         health = HealthMonitor(vpnStateRepository, frknLog)
+        networkMonitor.onUnderlyingNetworkChanged = { network ->
+            runCatching { setUnderlyingNetworks(network?.let { arrayOf(it) }) }
+        }
         commandLoop()
     }
 
@@ -113,6 +116,7 @@ class FrknVpnService :
                     Command.Reload -> doReload()
                     Command.Recover -> doRecover()
                     Command.CheckByeDpi -> doCheckByeDpi()
+                    Command.TestProxies -> doTestProxies()
                     Command.Stop -> doStop()
                 }
             }
@@ -307,14 +311,21 @@ class FrknVpnService :
     private fun startHealth(db: AppDatabase) {
         health.start(
             scope = scope,
-            engine = engine,
-            byeDpiPort = byeDpiPort.takeIf { byeDpi != null },
-            vpnActive = vpnActive,
-            onRefreshSubscription = { refreshSubscription(db) },
-            onRecoveryReload = { commandBus.recover() },
-            onByedpiUp = { commandBus.checkByeDpi() },
-            isFingerprintError = { engine.hasFingerprintError() }
+            params = HealthParams(
+                engine = engine,
+                byeDpiPort = byeDpiPort.takeIf { byeDpi != null },
+                vpnActive = vpnActive,
+                onRefreshSubscription = { refreshSubscription(db) },
+                onRecoveryReload = { commandBus.recover() },
+                onByedpiUp = { commandBus.checkByeDpi() },
+                isFingerprintError = { engine.hasFingerprintError() }
+            )
         )
+    }
+
+    private fun doTestProxies() {
+        if (lifecycle != Lifecycle.Running) return
+        engine.testProxies()
     }
 
     private fun doCheckByeDpi() {
@@ -393,6 +404,10 @@ class FrknVpnService :
         }
     }
 
+    override fun onProxyDelays(delays: Map<String, Int>) {
+        vpnStateRepository.updateProxyDelays(delays)
+    }
+
     override fun onStopRequested() {
         commandBus.stop()
     }
@@ -469,6 +484,7 @@ class FrknVpnService :
         routeWatchJob?.cancel()
         health.stop()
         notificationJob?.cancel()
+        networkMonitor.onUnderlyingNetworkChanged = null
         releaseEngineResources()
         scope.cancel()
         super.onDestroy()
