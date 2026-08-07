@@ -4,11 +4,11 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yulbax.frkn.R
-import io.github.yulbax.frkn.util.FrknLog
-import io.github.yulbax.frkn.util.LinkParser
-import io.github.yulbax.frkn.util.SubscriptionFetcher
-import io.github.yulbax.frkn.data.profile.ProfileDao
 import io.github.yulbax.frkn.data.profile.ProfileEntity
+import io.github.yulbax.frkn.data.profile.ProfileOperationResult
+import io.github.yulbax.frkn.data.profile.ProfileRepository
+import io.github.yulbax.frkn.util.FrknLog
+import io.github.yulbax.frkn.util.redactSensitiveData
 import io.github.yulbax.frkn.vpn.VpnCommandBus
 import io.github.yulbax.frkn.vpn.VpnStateRepository
 import kotlinx.coroutines.Dispatchers
@@ -18,9 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import org.koin.android.annotation.KoinViewModel
+import org.koin.core.annotation.KoinViewModel
 
 data class ServersUiState(
     val profiles: List<ProfileEntity> = emptyList(),
@@ -32,8 +30,8 @@ data class ServersUiState(
 @KoinViewModel
 class ProfileViewModel(
     private val application: Application,
-    private val profileDao: ProfileDao,
-    private val stateRepository: VpnStateRepository,
+    private val profileRepository: ProfileRepository,
+    stateRepository: VpnStateRepository,
     private val commandBus: VpnCommandBus,
     private val log: FrknLog
 ) : ViewModel() {
@@ -41,8 +39,8 @@ class ProfileViewModel(
     private val _error = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<ServersUiState> = combine(
-        profileDao.observeAll(),
-        profileDao.observeSelected(),
+        profileRepository.profiles,
+        profileRepository.selected,
         stateRepository.proxyDelays,
         _error
     ) { profiles, selected, delays, error ->
@@ -58,124 +56,52 @@ class ProfileViewModel(
     }
 
     fun add(raw: String) {
-        val input = raw.trim()
-        when {
-            LinkParser.parse(input) != null -> addLink(input)
-            input.startsWith("http://", ignoreCase = true) ||
-                input.startsWith("https://", ignoreCase = true) -> importSubscription(input)
-            else -> {
-                log.w(TAG, "add server: unsupported or invalid link")
-                _error.value = application.getString(R.string.invalid_link_error)
-            }
-        }
-    }
-
-    fun addLink(link: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val parsed = LinkParser.parse(link)
-            if (parsed == null) {
-                log.w(TAG, "add server: link parse failed")
-                _error.value = application.getString(R.string.invalid_link_error)
-                return@launch
-            }
-            val id = profileDao.insert(
-                ProfileEntity(
-                    name = parsed.name,
-                    type = parsed.type,
-                    link = link.trim(),
-                    outboundJson = Json.encodeToString(JsonObject.serializer(), parsed.outbound)
-                )
-            )
-            if (profileDao.getSelected() == null) profileDao.selectExclusive(id)
-        }
-    }
-
-    fun importSubscription(url: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val parsedList = runCatching { SubscriptionFetcher.fetch(url.trim()) }
-                .getOrElse {
-                    log.w(TAG, "subscription fetch failed", it)
-                    _error.value = application.getString(R.string.fetch_subscription_failed, it.message)
-                    return@launch
-                }
-            if (parsedList.isEmpty()) {
-                log.w(TAG, "subscription returned no servers")
-                _error.value = application.getString(R.string.no_servers_in_subscription)
-                return@launch
-            }
-            log.i(TAG, "subscription imported ${parsedList.size} servers")
-            var firstId = -1L
-            for (parsed in parsedList) {
-                val id = profileDao.insert(
-                    ProfileEntity(
-                        name = parsed.name,
-                        type = parsed.type,
-                        link = parsed.link,
-                        outboundJson = Json.encodeToString(JsonObject.serializer(), parsed.outbound),
-                        subscriptionUrl = url.trim()
-                    )
-                )
-                if (firstId == -1L) firstId = id
-            }
-            if (profileDao.getSelected() == null && firstId != -1L) profileDao.selectExclusive(firstId)
+            handleResult("add server", profileRepository.add(raw))
         }
     }
 
     fun update(profile: ProfileEntity, name: String, link: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val trimmedLink = link.trim()
-            if (trimmedLink.isNotEmpty() && trimmedLink != profile.link) {
-                val parsed = LinkParser.parse(trimmedLink)
-                if (parsed == null) {
-                    log.w(TAG, "edit server: link parse failed")
-                    _error.value = application.getString(R.string.invalid_link_error)
-                    return@launch
-                }
-                profileDao.updateConfig(
-                    id = profile.id,
-                    name = name.trim().ifBlank { parsed.name },
-                    type = parsed.type,
-                    link = trimmedLink,
-                    outboundJson = Json.encodeToString(JsonObject.serializer(), parsed.outbound)
-                )
-            } else {
-                profileDao.updateName(profile.id, name.trim().ifBlank { profile.name })
-            }
+            handleResult("edit server", profileRepository.update(profile, name, link))
         }
     }
 
     fun refreshSubscription(profile: ProfileEntity) {
-        val url = profile.subscriptionUrl.trim()
-        if (url.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
-            val parsedList = runCatching { SubscriptionFetcher.fetch(url) }
-                .getOrElse {
-                    log.w(TAG, "subscription refresh failed", it)
-                    _error.value = application.getString(R.string.fetch_subscription_failed, it.message)
-                    return@launch
-                }
-            if (parsedList.isEmpty()) {
-                log.w(TAG, "subscription refresh returned no servers")
-                _error.value = application.getString(R.string.no_servers_in_subscription)
-                return@launch
-            }
-            val fresh = parsedList.firstOrNull { it.name == profile.name } ?: parsedList.first()
-            profileDao.updateConfig(
-                id = profile.id,
-                name = profile.name,
-                type = fresh.type,
-                link = fresh.link,
-                outboundJson = Json.encodeToString(JsonObject.serializer(), fresh.outbound)
-            )
+            handleResult("subscription refresh", profileRepository.refreshSubscription(profile))
         }
     }
 
     fun select(profile: ProfileEntity) {
-        viewModelScope.launch(Dispatchers.IO) { profileDao.selectExclusive(profile.id) }
+        viewModelScope.launch(Dispatchers.IO) { profileRepository.select(profile) }
     }
 
     fun delete(profile: ProfileEntity) {
-        viewModelScope.launch(Dispatchers.IO) { profileDao.delete(profile) }
+        viewModelScope.launch(Dispatchers.IO) { profileRepository.delete(profile) }
+    }
+
+    private fun handleResult(operation: String, result: ProfileOperationResult) {
+        when (result) {
+            is ProfileOperationResult.Success -> {
+                if (result.affected > 1) log.i(TAG, "$operation: ${result.affected} servers")
+            }
+            ProfileOperationResult.InvalidLink -> {
+                log.w(TAG, "$operation: unsupported or invalid link")
+                _error.value = application.getString(R.string.invalid_link_error)
+            }
+            ProfileOperationResult.EmptySubscription -> {
+                log.w(TAG, "$operation: subscription returned no servers")
+                _error.value = application.getString(R.string.no_servers_in_subscription)
+            }
+            is ProfileOperationResult.FetchFailed -> {
+                log.w(TAG, "$operation: subscription fetch failed", result.cause)
+                _error.value = application.getString(
+                    R.string.fetch_subscription_failed,
+                    redactSensitiveData(result.cause.message ?: "unknown error")
+                )
+            }
+        }
     }
 
     private fun Map<String, Int>.toProfileDelays(): Map<Long, Int> =

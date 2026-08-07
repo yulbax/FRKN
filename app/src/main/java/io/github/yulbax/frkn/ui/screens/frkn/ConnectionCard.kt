@@ -45,7 +45,8 @@ internal fun ConnectionCard(
     stats: ConnectionStats,
     connected: Boolean,
     enabled: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
     val busy = state == VpnState.Connecting || state == VpnState.Verifying
@@ -67,7 +68,13 @@ internal fun ConnectionCard(
     val top by animateColorAsState(targetTop, tween(500), label = "top")
     val bottom by animateColorAsState(targetBottom, tween(500), label = "bottom")
     val content by animateColorAsState(
-        if (vivid) Color.White else scheme.onSurfaceVariant, tween(500), label = "content"
+        when {
+            busy -> Color(0xFF211A00)
+            vivid -> Color.White
+            else -> scheme.onSurfaceVariant
+        },
+        tween(500),
+        label = "content"
     )
 
     val title = when (state) {
@@ -85,11 +92,12 @@ internal fun ConnectionCard(
         is VpnState.Error -> state.message
     }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
             .background(Brush.verticalGradient(listOf(top, bottom)))
-            .padding(horizontal = 24.dp, vertical = 30.dp)
+            .padding(horizontal = 24.dp, vertical = 30.dp),
+        contentAlignment = Alignment.Center
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -101,7 +109,7 @@ internal fun ConnectionCard(
                     title,
                     style = MaterialTheme.typography.headlineMedium,
                     color = content,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(4.dp))
@@ -109,7 +117,7 @@ internal fun ConnectionCard(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = content.copy(alpha = 0.85f),
-                    maxLines = 1,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
                 val showSpeed = connected && (stats.vpnUp || stats.byedpiUp)

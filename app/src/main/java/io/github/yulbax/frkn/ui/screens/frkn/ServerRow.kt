@@ -24,8 +24,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SplitButton
 import androidx.compose.material3.SplitButtonDefaults
-import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.yulbax.frkn.R
@@ -75,7 +77,9 @@ internal fun ServerRow(
         onClick = onSelect,
         shape = RoundedCornerShape(18.dp),
         color = rowColor,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { selected = isSelected }
     ) {
         Row(
             modifier = Modifier
@@ -131,13 +135,13 @@ internal fun ServerRow(
                                 "$delayMs ms"
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = pingColor
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            SplitButtonLayout(
+            SplitButton(
                 leadingButton = {
                     SplitButtonDefaults.LeadingButton(
                         onClick = onEdit,

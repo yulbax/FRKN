@@ -835,7 +835,7 @@ static int protect(int conn_fd, const char *path)
         uniperror("socket");
         return -1;
     }
-    struct timeval tv = { .tv_sec = 1 };
+    struct timeval tv = { .tv_sec = 5 };
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
@@ -866,12 +866,13 @@ static int protect(int conn_fd, const char *path)
         close(fd);
         return -1;
     }
-    if (recv(fd, buf, 1, 0) < 1) {
+    unsigned char ack = 1;
+    if (recv(fd, &ack, sizeof(ack), 0) != sizeof(ack)) {
         uniperror("recv");
         close(fd);
         return -1;
     }
     close(fd);
-    return 0;
+    return ack == 0 ? 0 : -1;
 }
 #endif

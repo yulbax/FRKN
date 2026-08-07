@@ -126,7 +126,7 @@ object ConfigBuilder {
                     put("tag", PROXY_GROUP_TAG)
                     putJsonArray("outbounds") { proxies.forEach { add(it.tag) } }
                     put("default", defaultTag)
-//                    put("interrupt_exist_connections", true)
+                    put("interrupt_exist_connections", true)
                 })
                 add(buildJsonObject {
                     put("type", "socks")

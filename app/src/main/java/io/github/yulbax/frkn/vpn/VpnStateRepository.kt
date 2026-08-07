@@ -15,7 +15,6 @@ data class ConnectionStats(
     val byedpiActive: Boolean = false,
     val byedpiUp: Boolean = false,
     val byedpiLatencyMs: Int = 0,
-    val byedpiCountry: String = "",
     val byedpiChecking: Boolean = false,
     val byedpiReachable: Int = 0,
     val byedpiTotal: Int = 0,

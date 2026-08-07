@@ -58,7 +58,7 @@ fun HintBanner(
                         .padding(top = 2.dp)
                 )
                 if (onDismiss != null) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onDismiss) {
                         Icon(
                             Icons.Filled.Close,
                             contentDescription = stringResource(R.string.dismiss),

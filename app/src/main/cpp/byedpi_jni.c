@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <pthread.h>
 #include <sys/socket.h>
 
 #include "byedpi/params.h"
@@ -24,14 +25,65 @@ extern int parse_args(int argc, char **argv);
 extern int init(void);
 extern void clear_params(char *line, char **argv);
 extern void dump_all_cache(void);
-extern int server_fd;
-
 static struct params params_backup;
 static int backup_saved = 0;
+static pthread_mutex_t state_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int start_prepared = 0;
+static int native_running = 0;
+static int stop_requested = 0;
+static int active_server_fd = -1;
+
+JNIEXPORT jboolean JNICALL
+Java_io_github_yulbax_frkn_engine_ByeDpi_nativePrepareStart(
+        JNIEnv *env, jobject thiz) {
+    pthread_mutex_lock(&state_mutex);
+    if (native_running || start_prepared) {
+        pthread_mutex_unlock(&state_mutex);
+        return JNI_FALSE;
+    }
+    start_prepared = 1;
+    stop_requested = 0;
+    active_server_fd = -1;
+    pthread_mutex_unlock(&state_mutex);
+    return JNI_TRUE;
+}
+
+int frkn_publish_server_fd(int fd) {
+    pthread_mutex_lock(&state_mutex);
+    if (stop_requested || !native_running) {
+        pthread_mutex_unlock(&state_mutex);
+        return 0;
+    }
+    active_server_fd = fd;
+    pthread_mutex_unlock(&state_mutex);
+    return 1;
+}
+
+void frkn_clear_server_fd(int fd) {
+    pthread_mutex_lock(&state_mutex);
+    if (active_server_fd == fd) active_server_fd = -1;
+    pthread_mutex_unlock(&state_mutex);
+}
 
 JNIEXPORT jint JNICALL
 Java_io_github_yulbax_frkn_engine_ByeDpi_nativeStart(
-        JNIEnv *env, jclass clazz, jobjectArray jargs) {
+        JNIEnv *env, jobject thiz, jobjectArray jargs) {
+
+    pthread_mutex_lock(&state_mutex);
+    if (!start_prepared || native_running) {
+        pthread_mutex_unlock(&state_mutex);
+        return -2;
+    }
+    start_prepared = 0;
+    native_running = 1;
+    int cancelled = stop_requested;
+    pthread_mutex_unlock(&state_mutex);
+    if (cancelled) {
+        pthread_mutex_lock(&state_mutex);
+        native_running = 0;
+        pthread_mutex_unlock(&state_mutex);
+        return 0;
+    }
 
     // Snapshot the untouched defaults once; restore them on every later start so
     // a previous run's parsed state (groups, mempool pointers) does not leak.
@@ -54,6 +106,9 @@ Java_io_github_yulbax_frkn_engine_ByeDpi_nativeStart(
     jsize argc = (*env)->GetArrayLength(env, jargs);
     char **argv = calloc((size_t) argc + 1, sizeof(char *));
     if (!argv) {
+        pthread_mutex_lock(&state_mutex);
+        native_running = 0;
+        pthread_mutex_unlock(&state_mutex);
         return -1;
     }
     for (jsize i = 0; i < argc; i++) {
@@ -81,13 +136,20 @@ Java_io_github_yulbax_frkn_engine_ByeDpi_nativeStart(
         free(argv[i]);
     }
     free(argv);
+
+    pthread_mutex_lock(&state_mutex);
+    active_server_fd = -1;
+    native_running = 0;
+    pthread_mutex_unlock(&state_mutex);
     return result;
 }
 
 JNIEXPORT void JNICALL
 Java_io_github_yulbax_frkn_engine_ByeDpi_nativeStop(
-        JNIEnv *env, jclass clazz) {
-    if (server_fd > 0) {
-        shutdown(server_fd, SHUT_RDWR);
-    }
+        JNIEnv *env, jobject thiz) {
+    pthread_mutex_lock(&state_mutex);
+    stop_requested = 1;
+    start_prepared = 0;
+    if (active_server_fd >= 0) shutdown(active_server_fd, SHUT_RDWR);
+    pthread_mutex_unlock(&state_mutex);
 }

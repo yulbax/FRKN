@@ -2,18 +2,24 @@ name: Release
 
 # On a push to main: read versionName from app/build.gradle.kts and, ONLY if the
 # matching tag doesn't exist yet (i.e. you bumped the version), build the FOSS release
-# APKs and cut a GitHub Release with the tag. Plain commits (version unchanged) do
-# nothing. Mirrors the GitLab pipeline (.gitlab-ci.yml).
+# APKs and cut a GitHub Release with the tag. Quality checks still run when the
+# version is unchanged. Mirrors the GitLab pipeline (.gitlab-ci.yml).
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
-  contents: write          # softprops/action-gh-release creates the tag + release
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  SING_BOX_TAG: "v1.13.13"
-  LIBBOX_CACHE_REV: "4"    # bump to force a fresh libbox.aar rebuild (busts the cache)
+  SING_BOX_TAG: "v1.13.16"
+  LIBBOX_CACHE_REV: "5"    # bump to force a fresh libbox.aar rebuild (busts the cache)
   GO_VERSION: "1.24.7"
   NDK_VERSION: "28.0.13004108"
   ANDROID_COMPILE_SDK: "37.0"
@@ -35,6 +41,11 @@ jobs:
           VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n1)"
           [ -n "$VERSION" ] || { echo "versionName not found in app/build.gradle.kts"; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            echo "Pull request: quality checks only."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
             echo "Tag v$VERSION already exists — version not bumped, nothing to release."
             echo "should_release=false" >> "$GITHUB_OUTPUT"
@@ -46,7 +57,6 @@ jobs:
   # ── Build sing-box's libbox.aar (3 ABIs). Cached by sing-box tag + rev. ──────────
   libbox:
     needs: check
-    if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -80,9 +90,28 @@ jobs:
           path: app/libs/libbox.aar
           retention-days: 1
 
+  quality:
+    needs: libbox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: libbox
+          path: app/libs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${BUILD_TOOLS}" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests, Android Lint, and debug build
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+
   # ── Build the release APKs (arm64 + x86_64 + armv7 + universal), signed. ─────────
   build:
-    needs: [check, libbox]
+    needs: [check, libbox, quality]
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -102,7 +131,9 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          test -n "$KEYSTORE_BASE64"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          test -s "$RUNNER_TEMP/release.jks"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
       - name: Assemble release
         env:
@@ -123,6 +154,8 @@ jobs:
     needs: [check, build]
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -152,6 +185,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ needs.check.outputs.version }}"
+          target_commitish: ${{ github.sha }}
           name: "FRKN v${{ needs.check.outputs.version }}"
           body_path: CHANGELOG.md
           files: apks/*.apk

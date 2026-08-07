@@ -42,10 +42,13 @@
 #endif
 
 
-int server_fd;
+int server_fd = -1;
+
+extern int frkn_publish_server_fd(int fd);
+extern void frkn_clear_server_fd(int fd);
 
 static void on_cancel(int sig) {
-    shutdown(server_fd, SHUT_RDWR);
+    if (server_fd >= 0) shutdown(server_fd, SHUT_RDWR);
 }
 
 void dump_all_cache(void);
@@ -1014,14 +1017,22 @@ int on_ignore(struct poolhd *pool, struct eval *val, int etype)
 
 int start_event_loop(int srvfd)
 {
+    if (!frkn_publish_server_fd(srvfd)) {
+        close(srvfd);
+        return 0;
+    }
     server_fd = srvfd;
     
     struct poolhd *pool = init_pool(params.max_open * 2 + 1);
     if (!pool) {
+        frkn_clear_server_fd(srvfd);
+        server_fd = -1;
         close(srvfd);
         return -1;
     }
     if (!add_event(pool, &on_accept, srvfd, POLLIN)) {
+        frkn_clear_server_fd(srvfd);
+        server_fd = -1;
         destroy_pool(pool);
         close(srvfd);
         return -1;
@@ -1029,6 +1040,8 @@ int start_event_loop(int srvfd)
     loop_event(pool);
     
     LOG(LOG_S, "exit\n");
+    frkn_clear_server_fd(srvfd);
+    server_fd = -1;
     destroy_pool(pool);
     return 0;
 }

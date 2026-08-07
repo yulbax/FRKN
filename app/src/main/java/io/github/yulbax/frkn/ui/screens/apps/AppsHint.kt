@@ -47,7 +47,7 @@ internal fun AppsHint(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                IconButton(onClick = onDismiss) {
                     Icon(
                         Icons.Filled.Close,
                         contentDescription = stringResource(R.string.dismiss),

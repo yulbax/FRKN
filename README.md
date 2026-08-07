@@ -41,12 +41,22 @@ FRKN combines two engines behind a single VPN interface:
 
 FRKN is fully open-source — no Google services, no proprietary dependencies.
 
+The app depends on a pinned sing-box Go Mobile binding that is built locally rather than
+committed as a binary. Install Go, the SagerNet `gomobile` tools, and point
+`ANDROID_NDK_HOME` at NDK 28 before the first build:
+
 ```bash
+go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+export PATH="$(go env GOPATH)/bin:$PATH"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"
+bash scripts/build-libbox.sh
 ./gradlew assembleDebug
 ```
 
-Requires the Android SDK, NDK and CMake (the ByeDPI native engine is compiled from source).
-A physical device is recommended — Android's VPN APIs are unreliable on emulators.
+The app supports Android 10 (API 29) and newer. Building requires Android SDK 37 and
+CMake 3.22.1. A physical device is recommended; Android's VPN APIs are unreliable on
+emulators.
 
 ## Built with
 

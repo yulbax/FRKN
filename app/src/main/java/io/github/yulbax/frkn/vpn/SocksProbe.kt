@@ -1,37 +1,36 @@
 package io.github.yulbax.frkn.vpn
 
+import android.os.SystemClock
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.ProxyBuilder
 import io.ktor.client.engine.android.Android
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.Authenticator
 import java.net.PasswordAuthentication
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.milliseconds
 
 object SocksProbe {
-    private const val GEO_URL = "https://api.ipapi.is/"
     private const val PROBE_TIMEOUT_MS = 6_000
-    private val COUNTRY_REGEX = Regex("\"country_code\"\\s*:\\s*\"([A-Za-z]{2})\"")
-    private val proxyCredentials = AtomicReference<PasswordAuthentication?>(null)
+    private const val GEO_URL = "https://api.ipapi.is/"
+    private val COUNTRY_REGEX = Regex("\"(?:cc|country_code)\"\\s*:\\s*\"([A-Za-z]{2})\"")
+    private val authenticatorMutex = Mutex()
     private val clients = ConcurrentHashMap<Int, HttpClient>()
-
-    init {
-        Authenticator.setDefault(object : Authenticator() {
-            override fun getPasswordAuthentication(): PasswordAuthentication? = proxyCredentials.get()
-        })
-    }
 
     suspend fun latencyMs(socksPort: Int, username: String?, password: String?, url: String): Int? =
         withContext(Dispatchers.IO) {
             withClient(socksPort, username, password) { client ->
-                val start = System.currentTimeMillis()
+                val start = SystemClock.elapsedRealtime()
                 val response = client.get(url)
                 if (response.status.value in 200..399) {
-                    (System.currentTimeMillis() - start).toInt().coerceAtLeast(1)
+                    (SystemClock.elapsedRealtime() - start).toInt().coerceAtLeast(1)
                 } else {
                     null
                 }
@@ -69,13 +68,26 @@ object SocksProbe {
         block: suspend (HttpClient) -> T
     ): T? {
         val useAuth = username != null && password != null
-        if (useAuth) proxyCredentials.set(PasswordAuthentication(username, password.toCharArray()))
-        return try {
-            block(clientFor(port))
-        } catch (_: Throwable) {
+        suspend fun execute(): T? = try {
+            withTimeoutOrNull(PROBE_TIMEOUT_MS.milliseconds) { block(clientFor(port)) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
             null
-        } finally {
-            if (useAuth) proxyCredentials.set(null)
+        }
+
+        if (!useAuth) return execute()
+        return authenticatorMutex.withLock {
+            val credentials = PasswordAuthentication(username, password.toCharArray())
+            Authenticator.setDefault(object : Authenticator() {
+                override fun getPasswordAuthentication(): PasswordAuthentication = credentials
+            })
+            try {
+                execute()
+            } finally {
+                Authenticator.setDefault(null)
+            }
         }
     }
+
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -46,13 +47,14 @@ internal fun ChannelStatusCard(
     up: Boolean,
     hasApps: Boolean,
     latencyMs: Int,
-    country: String,
+    country: String = "",
     shape: Shape,
     modifier: Modifier = Modifier,
     cycling: Boolean = false,
     reachable: Int = 0,
     total: Int = 0,
     checking: Boolean = false,
+    fillHeight: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val reconnecting = hasApps && active && !up
@@ -66,11 +68,12 @@ internal fun ChannelStatusCard(
     val statusLine = when {
         !hasApps -> stringResource(R.string.channel_status_no_apps)
         !active -> stringResource(R.string.channel_status_off)
-        up -> stringResource(R.string.channel_status_online, latencyMs)
+        up && latencyMs > 0 -> stringResource(R.string.channel_status_online, latencyMs)
+        up -> stringResource(R.string.channel_status_ready)
         cycling -> stringResource(R.string.channel_status_generating_fp)
         else -> stringResource(R.string.channel_status_connecting)
     }
-    val statusColor = if (reconnecting) reconnectColor else MaterialTheme.colorScheme.onSurfaceVariant
+    val statusColor = MaterialTheme.colorScheme.onSurfaceVariant
     val dotAlpha = if (reconnecting) {
         val transition = rememberInfiniteTransition(label = "reconnect")
         transition.animateFloat(
@@ -91,7 +94,7 @@ internal fun ChannelStatusCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
+                .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier.heightIn(min = 56.dp))
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)

@@ -62,16 +62,23 @@ class SingBoxEngine(
     }
 
     override fun start(config: EngineConfig) {
+        check(commandServer == null) { "sing-box engine is already started" }
         runCatching { boxLogFile.takeIf { it.exists() }?.writeText("") }
         val server = Libbox.newCommandServer(this, this)
-        server.start()
-        server.startOrReloadService(buildConfig(config), OverrideOptions())
         commandServer = server
-        startCommandClient()
+        try {
+            server.start()
+            server.startOrReloadService(buildConfig(config), OverrideOptions())
+            startCommandClient()
+        } catch (t: Throwable) {
+            stop()
+            throw t
+        }
     }
 
     override fun reloadRouting(config: EngineConfig) {
-        commandServer?.startOrReloadService(buildConfig(config), OverrideOptions())
+        val server = checkNotNull(commandServer) { "sing-box engine is not started" }
+        server.startOrReloadService(buildConfig(config), OverrideOptions())
     }
 
     override fun hasFingerprintError(): Boolean = runCatching {
@@ -192,7 +199,7 @@ class SingBoxEngine(
     }
 
     override fun autoDetectInterfaceControl(fd: Int) {
-        tunPlatform.protectFd(fd)
+        check(tunPlatform.protectFd(fd)) { "failed to protect socket fd=$fd" }
     }
 
     override fun findConnectionOwner(

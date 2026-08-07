@@ -7,8 +7,8 @@ variables:
   NDK_VERSION: "28.0.13004108"
   CMAKE_VERSION: "3.22.1"
   CMDLINE_TOOLS_VERSION: "11076708"
-  SING_BOX_TAG: "v1.13.13"
-  LIBBOX_CACHE_REV: "4"
+  SING_BOX_TAG: "v1.13.16"
+  LIBBOX_CACHE_REV: "5"
   GO_VERSION: "1.24.7"
   GOPATH: "${CI_PROJECT_DIR}/.go"
   GOCACHE: "${CI_PROJECT_DIR}/.gocache"
@@ -18,6 +18,7 @@ variables:
 stages:
   - autotag
   - libbox
+  - quality
   - build
   - upload
   - release
@@ -90,6 +91,8 @@ libbox:
   stage: libbox
   rules:
     - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   cache:
     - key: "android-${CI_COMMIT_REF_SLUG}"
       paths:
@@ -119,16 +122,45 @@ libbox:
       - app/libs/libbox.aar
     expire_in: 30 days
 
+quality:
+  extends: .android_base
+  stage: quality
+  needs: ["libbox"]
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
+    - export PATH="${ANDROID_SDK_ROOT}/cmake/${CMAKE_VERSION}/bin:${PATH}"
+    - ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+
 build:release:
   extends: .android_base
   stage: build
   rules:
     - if: $CI_COMMIT_TAG
-  needs: ["libbox"]
+  needs: ["libbox", "quality"]
   script:
     - export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
     - export PATH="${ANDROID_SDK_ROOT}/cmake/${CMAKE_VERSION}/bin:${PATH}"
-    - ./gradlew assembleRelease --no-daemon
+    - |
+      if [ -n "${KEYSTORE_BASE64:-}" ]; then
+        export KEYSTORE_FILE="${CI_PROJECT_DIR}/release.jks"
+        printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+      fi
+      test -n "${KEYSTORE_FILE:-}" && test -s "$KEYSTORE_FILE" || {
+        echo "ERROR: configure KEYSTORE_BASE64 or a valid KEYSTORE_FILE"; exit 1;
+      }
+      test -n "${KEYSTORE_PASSWORD:-}" && test -n "${KEY_ALIAS:-}" && test -n "${KEY_PASSWORD:-}" || {
+        echo "ERROR: release signing passwords/alias are missing"; exit 1;
+      }
+      VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n1)"
+      test "${CI_COMMIT_TAG}" = "v${VERSION}" || {
+        echo "ERROR: tag ${CI_COMMIT_TAG} does not match versionName ${VERSION}"; exit 1;
+      }
+      export KEYSTORE_FILE
+      ./gradlew assembleRelease --no-daemon
   artifacts:
     name: "frkn-release-${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -144,9 +176,12 @@ upload:apk:
   script:
     - |
       set -e
+      VERSION="${CI_COMMIT_TAG#v}"
       for abi in arm64-v8a x86_64 armeabi-v7a universal; do
+        APK="app/build/outputs/apk/release/FRKN-${VERSION}-${abi}.apk"
+        test -f "$APK" || { echo "Missing release artifact: $APK"; exit 1; }
         curl --fail --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-          --upload-file "app/build/outputs/apk/release/app-${abi}-release.apk" \
+          --upload-file "$APK" \
           "${PACKAGE_REGISTRY_URL}/frkn-${CI_COMMIT_TAG}-${abi}.apk"
       done
 

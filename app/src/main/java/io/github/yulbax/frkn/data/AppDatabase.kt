@@ -12,7 +12,7 @@ import io.github.yulbax.frkn.data.profile.ProfileEntity
 @Database(
     entities = [App::class, SettingsEntity::class, ProfileEntity::class],
     version = 3,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 

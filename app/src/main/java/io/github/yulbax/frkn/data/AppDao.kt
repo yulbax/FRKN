@@ -2,6 +2,7 @@ package io.github.yulbax.frkn.data
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -11,6 +12,9 @@ interface AppDao {
     @Query("SELECT * FROM apps")
     fun getAllApps(): Flow<List<App>>
 
+    @Query("SELECT * FROM apps")
+    suspend fun getAllAppsSnapshot(): List<App>
+
     @Query("SELECT * FROM apps WHERE packageName = :packageName")
     suspend fun getApp(packageName: String): App?
 
@@ -19,6 +23,20 @@ interface AppDao {
 
     @Upsert
     suspend fun upsertApps(apps: List<App>)
+
+    @Query("UPDATE apps SET connectionType = :connectionType WHERE packageName = :packageName")
+    suspend fun updateConnectionType(
+        packageName: String,
+        connectionType: ConnectionType
+    ): Int
+
+    @Transaction
+    suspend fun setConnectionTypes(apps: List<App>) {
+        apps.forEach { app ->
+            val updated = updateConnectionType(app.packageName, app.connectionType)
+            if (updated == 0) upsertApp(app)
+        }
+    }
 
     @Query("DELETE FROM apps WHERE packageName = :packageName")
     suspend fun deleteApp(packageName: String)

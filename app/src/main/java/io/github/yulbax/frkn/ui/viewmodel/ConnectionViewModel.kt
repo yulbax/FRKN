@@ -5,9 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yulbax.frkn.data.AppDao
 import io.github.yulbax.frkn.data.ConnectionType
-import io.github.yulbax.frkn.data.SettingsDao
-import io.github.yulbax.frkn.data.SettingsEntity
-import kotlinx.coroutines.flow.first
+import io.github.yulbax.frkn.data.SettingsRepository
 import io.github.yulbax.frkn.vpn.ByeDpiQuality
 import io.github.yulbax.frkn.vpn.ConnectionStats
 import io.github.yulbax.frkn.vpn.FrknVpnService
@@ -25,7 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.koin.android.annotation.KoinViewModel
+import org.koin.core.annotation.KoinViewModel
 
 data class FrknUiState(
     val homeHintSeen: Boolean = true,
@@ -39,12 +37,12 @@ class ConnectionViewModel(
     private val application: Application,
     vpnStateRepository: VpnStateRepository,
     appDao: AppDao,
-    private val settingsDao: SettingsDao,
+    private val settingsRepository: SettingsRepository,
     private val commandBus: VpnCommandBus
 ) : ViewModel() {
 
     val uiState: StateFlow<FrknUiState> = combine(
-        settingsDao.observeSettings().map { it?.homeHintSeen ?: false },
+        settingsRepository.settings.map { it.homeHintSeen },
         appDao.getAllApps()
     ) { homeHintSeen, apps ->
         val hasVpn = apps.any { it.connectionType == ConnectionType.VPN }
@@ -54,8 +52,7 @@ class ConnectionViewModel(
 
     fun dismissHomeHint() {
         viewModelScope.launch {
-            val current = settingsDao.observeSettings().first() ?: SettingsEntity()
-            if (!current.homeHintSeen) settingsDao.upsertSettings(current.copy(homeHintSeen = true))
+            settingsRepository.update { it.copy(homeHintSeen = true) }
         }
     }
 

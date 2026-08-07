@@ -184,39 +184,43 @@ void dump_cache(struct mphdr *hdr, FILE *out, struct desync_params *dp)
 
 void load_cache(struct mphdr *hdr, FILE *in, struct desync_params *dp)
 {
-    for (int i = 0; ; i++) {
+    char line[512];
+    while (fgets(line, sizeof(line), in)) {
         char addr_str[INET6_ADDRSTRLEN] = { 0 };
         char host[256] = { 0 };
-        
-        int bitlen;
-        uint16_t port;
-        time_t cache_time;
-        
-        int c = fscanf(in, "0 %39s %d %hu %jd %255s\n", 
-            addr_str, &bitlen, &port, &cache_time, host);
-        if (c < 1) {
-            return;
-        }
+
+        int prefix_len;
+        unsigned int serialized_port;
+        intmax_t serialized_time;
+
+        int c = sscanf(line, "0 %39s %d %u %jd %255s",
+            addr_str, &prefix_len, &serialized_port, &serialized_time, host);
+        if (c != 5 || serialized_port > UINT16_MAX) continue;
+
+        time_t cache_time = (time_t) serialized_time;
+        if ((intmax_t) cache_time != serialized_time) continue;
+
         struct cache_key key = { 0 };
         int key_size = offsetof(struct cache_key, ip.v4);
-        bitlen += key_size * 8;
-        
+
+        int max_prefix_len;
         if (inet_pton(AF_INET, addr_str, &key.ip.v4) <= 0) {
             if (inet_pton(AF_INET6, addr_str, &key.ip.v6) <= 0) {
                 continue;
             } else {
                 key.family = AF_INET6;
                 key_size += sizeof(key.ip.v6);
+                max_prefix_len = 128;
             }
         }
         else {
             key.family = AF_INET;
             key_size += sizeof(key.ip.v4);
+            max_prefix_len = 32;
         }
-        if (key_size * 8 < bitlen) {
-            continue;
-        }
-        key.port = htons(port);
+        if (prefix_len < 0 || prefix_len > max_prefix_len) continue;
+        int bitlen = prefix_len + offsetof(struct cache_key, ip.v4) * 8;
+        key.port = htons((uint16_t) serialized_port);
         
         struct cache_key *data = calloc(1, key_size);
         if (!data) {
@@ -239,4 +243,3 @@ void load_cache(struct mphdr *hdr, FILE *in, struct desync_params *dp)
         }
     }
 }
-

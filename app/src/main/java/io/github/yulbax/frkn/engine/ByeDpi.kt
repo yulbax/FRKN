@@ -19,8 +19,6 @@ class ByeDpi(
     private var worker: Thread? = null
 
     fun start() {
-        if (!running.compareAndSet(false, true)) return
-        stopRequested = false
         val args = buildList {
             add("ciadpi")
             add("-i"); add(host)
@@ -29,33 +27,71 @@ class ByeDpi(
             addAll(extraArgs)
         }.toTypedArray()
 
-        worker = thread(name = "byedpi") {
-            Log.i(TAG, "byedpi starting on $host:$port args=${args.joinToString(" ")}")
-            val code = nativeStart(args)
-            Log.i(TAG, "byedpi exited with code $code")
-            running.set(false)
-            if (!stopRequested) onUnexpectedExit?.invoke(code)
+        synchronized(LIFECYCLE_LOCK) {
+            if (running.get()) return
+            check(activeInstance == null) { "another ByeDPI worker is still active" }
+            check(nativePrepareStart()) { "native ByeDPI worker is still active" }
+            stopRequested = false
+            running.set(true)
+            activeInstance = this
+            val newWorker = thread(start = false, name = "byedpi") {
+                Log.i(TAG, "byedpi starting on $host:$port args=${args.joinToString(" ")}")
+                val code = try {
+                    nativeStart(args)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "byedpi native worker failed", t)
+                    -1
+                }
+                Log.i(TAG, "byedpi exited with code $code")
+                val unexpected = synchronized(LIFECYCLE_LOCK) {
+                    running.set(false)
+                    worker = null
+                    if (activeInstance === this) activeInstance = null
+                    !stopRequested
+                }
+                if (unexpected) onUnexpectedExit?.invoke(code)
+            }
+            worker = newWorker
+            try {
+                newWorker.start()
+            } catch (t: Throwable) {
+                runCatching { nativeStop() }
+                worker = null
+                activeInstance = null
+                running.set(false)
+                throw t
+            }
         }
     }
 
     fun stop() {
-        if (!running.get()) return
-        stopRequested = true
+        val activeWorker = synchronized(LIFECYCLE_LOCK) {
+            val current = worker ?: return
+            stopRequested = true
+            current
+        }
         nativeStop()
-        worker?.join(2000)
-        worker = null
-        running.set(false)
+        if (activeWorker !== Thread.currentThread()) activeWorker.join()
+        synchronized(LIFECYCLE_LOCK) {
+            check(!activeWorker.isAlive) { "ByeDPI worker did not stop" }
+            if (worker === activeWorker) worker = null
+            if (activeInstance === this) activeInstance = null
+            running.set(false)
+        }
     }
 
     fun isRunning(): Boolean = running.get()
 
     private external fun nativeStart(args: Array<String>): Int
+    private external fun nativePrepareStart(): Boolean
     private external fun nativeStop()
 
     companion object {
         const val DEFAULT_HOST = "127.0.0.1"
         const val DEFAULT_PORT = 1081
         private const val TAG = "ByeDpi"
+        private val LIFECYCLE_LOCK = Any()
+        private var activeInstance: ByeDpi? = null
 
         val DEFAULT_DESYNC_ARGS = listOf(
             "-d1", "-s1+s", "-s3+s", "-s6+s", "-s9+s", "-s12+s", "-s15+s", "-s20+s", "-s30+s", "-a1"

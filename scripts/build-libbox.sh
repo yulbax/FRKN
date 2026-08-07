@@ -24,7 +24,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-SING_BOX_TAG="${SING_BOX_TAG:-v1.13.13}"
+SING_BOX_TAG="${SING_BOX_TAG:-v1.13.16}"
 SING_BOX_REPO="${SING_BOX_REPO:-https://github.com/SagerNet/sing-box.git}"
 WORK_DIR="${LIBBOX_WORK_DIR:-${REPO_ROOT}/.libbox-build}"
 SRC="${WORK_DIR}/sing-box"
@@ -152,7 +152,7 @@ mkdir -p "$(dirname "$OUT_AAR")"
 gomobile bind -v \
   -o "$OUT_AAR" \
   -target=android/arm64,android/amd64,android/arm \
-  -androidapi 24 \
+  -androidapi 29 \
   -trimpath -buildvcs=false \
   -ldflags "$LDFLAGS" \
   -tags "$TAGS" \

@@ -45,7 +45,17 @@ char tls_data[517] = {
     "\x4b\xfb\x0e\x00\x15\x00\xac\x00\x00\x00\x00\x00\x00"
 };
 
-char http_data[43] __attribute__((nonstring)) = {
+#if defined(__has_attribute)
+#if __has_attribute(nonstring)
+#define BYEDPI_NONSTRING __attribute__((nonstring))
+#else
+#define BYEDPI_NONSTRING
+#endif
+#else
+#define BYEDPI_NONSTRING __attribute__((nonstring))
+#endif
+
+char http_data[43] BYEDPI_NONSTRING = {
     "GET / HTTP/1.1\r\n"
     "Host: www.wikipedia.org\r\n\r\n"
 };

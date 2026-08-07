@@ -14,6 +14,9 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles ORDER BY id")
     fun observeAll(): Flow<List<ProfileEntity>>
 
+    @Query("SELECT * FROM profiles ORDER BY id")
+    suspend fun getAll(): List<ProfileEntity>
+
     @Query("SELECT * FROM profiles WHERE selected = 1 ORDER BY id LIMIT 1")
     fun observeSelected(): Flow<ProfileEntity?>
 
@@ -22,6 +25,9 @@ interface ProfileDao {
 
     @Insert
     suspend fun insert(profile: ProfileEntity): Long
+
+    @Insert
+    suspend fun insertAll(profiles: List<ProfileEntity>): List<Long>
 
     @Update
     suspend fun update(profile: ProfileEntity)

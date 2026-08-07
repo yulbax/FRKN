@@ -15,15 +15,16 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.yulbax.frkn.R
 import io.github.yulbax.frkn.ui.viewmodel.AppsViewModel
 import kotlinx.coroutines.launch
@@ -34,11 +35,11 @@ fun Apps(
     query: String,
     viewModel: AppsViewModel = koinViewModel()
 ) {
-    val apps by viewModel.apps.collectAsState()
-    val allApps by viewModel.allApps.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val error by viewModel.error.collectAsState()
-    val appsHintSeen by viewModel.appsHintSeen.collectAsState()
+    val apps by viewModel.apps.collectAsStateWithLifecycle()
+    val allApps by viewModel.allApps.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val appsHintSeen by viewModel.appsHintSeen.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -58,7 +59,10 @@ fun Apps(
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     if (!appsHintSeen) AppsHint(onDismiss = viewModel::dismissAppsHint)
-                    val snackbarPattern = stringResource(R.string.set_apps_snackbar)
+                    val snackbarPattern = pluralStringResource(
+                        R.plurals.set_apps_snackbar,
+                        bulkTargets.size
+                    )
                     val undoLabel = stringResource(R.string.undo)
                     Row(
                         modifier = Modifier

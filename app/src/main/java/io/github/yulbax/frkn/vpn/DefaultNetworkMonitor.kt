@@ -86,13 +86,10 @@ class DefaultNetworkMonitor(
 
     fun start() {
         if (registered) return
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-                connectivity.registerBestMatchingNetworkCallback(request, callback, handler)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ->
-                connectivity.requestNetwork(request, callback, handler)
-            else ->
-                connectivity.registerDefaultNetworkCallback(callback)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            connectivity.registerBestMatchingNetworkCallback(request, callback, handler)
+        } else {
+            connectivity.requestNetwork(request, callback, handler)
         }
         registered = true
         underlyingNetwork = connectivity.activeNetwork

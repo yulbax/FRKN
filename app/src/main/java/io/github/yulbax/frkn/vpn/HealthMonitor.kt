@@ -1,157 +1,181 @@
 package io.github.yulbax.frkn.vpn
 
+import io.github.yulbax.frkn.BuildConfig
 import io.github.yulbax.frkn.util.FrknLog
 import io.github.yulbax.frkn.vpn.core.VpnEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.shareIn
 import kotlin.time.Duration.Companion.milliseconds
 
-
-data class HealthParams(
+data class ProbeParams(
     val engine: VpnEngine,
     val byeDpiPort: Int?,
     val vpnActive: Boolean,
-    val onRefreshSubscription: suspend () -> Unit,
-    val onRecoveryReload: suspend () -> Unit,
-    val onByedpiUp: suspend () -> Unit,
     val isFingerprintError: () -> Boolean
 )
+
+data class HealthParams(
+    val probe: ProbeParams,
+    val onRefreshSubscription: suspend () -> Unit,
+    val onRecoveryReload: suspend () -> Unit,
+    val onByedpiUp: suspend () -> Unit
+)
+
+data class HealthSnapshot(
+    val vpnActive: Boolean,
+    val vpnDelayMs: Int?,
+    val vpnCountry: String,
+    val byedpiActive: Boolean,
+    val byedpiDelayMs: Int?,
+    val fpError: Boolean
+) {
+    val vpnUp get() = vpnDelayMs != null
+    val byedpiUp get() = byedpiDelayMs != null
+    val anyUp get() = vpnUp || byedpiUp
+    val allActiveUp get() = (!vpnActive || vpnUp) && (!byedpiActive || byedpiUp)
+}
+
+class ConnectionHealthObserver {
+    fun observe(params: ProbeParams): Flow<HealthSnapshot> = flow {
+        val engine = params.engine
+        var country = ""
+        while (true) {
+            val vpnDelay = if (params.vpnActive) {
+                SocksProbe.latencyMs(
+                    engine.probeSocksPort, engine.probeUsername, engine.probePassword, VPN_PROBE_URL
+                )
+            } else null
+            val byedpiDelay = params.byeDpiPort?.let {
+                SocksProbe.latencyMs(it, null, null, BYEDPI_PROBE_URL)
+            }
+            if (vpnDelay != null && country.isEmpty()) {
+                country = SocksProbe.resolveCountry(
+                    engine.probeSocksPort, engine.probeUsername, engine.probePassword
+                ) ?: country
+            }
+            val snapshot = HealthSnapshot(
+                vpnActive = params.vpnActive,
+                vpnDelayMs = vpnDelay,
+                vpnCountry = country,
+                byedpiActive = params.byeDpiPort != null,
+                byedpiDelayMs = byedpiDelay,
+                fpError = params.isFingerprintError()
+            )
+            emit(snapshot)
+            delay((if (snapshot.allActiveUp) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS).milliseconds)
+        }
+    }
+
+    companion object {
+        private const val HEALTH_INTERVAL_MS = 15_000L
+        private const val HEALTH_RETRY_MS = 3_000L
+        private const val VPN_PROBE_URL = BuildConfig.VPN_HEALTH_PROBE_URL
+        private const val BYEDPI_PROBE_URL = BuildConfig.BYEDPI_HEALTH_PROBE_URL
+    }
+}
 
 class HealthMonitor(
     private val stateRepository: VpnStateRepository,
     private val log: FrknLog
 ) {
-    private var job: Job? = null
-    private var vpnCountry: String = ""
-    private var byedpiCountry: String = ""
+    private val observer = ConnectionHealthObserver()
+    private var scope: CoroutineScope? = null
 
     fun start(scope: CoroutineScope, params: HealthParams) {
-        val engine = params.engine
-        val byeDpiPort = params.byeDpiPort
-        val vpnActive = params.vpnActive
-        val onRefreshSubscription = params.onRefreshSubscription
-        val onRecoveryReload = params.onRecoveryReload
-        val onByedpiUp = params.onByedpiUp
-        val isFingerprintError = params.isFingerprintError
-        job?.cancel()
-        vpnCountry = ""
-        byedpiCountry = ""
-        job = scope.launch {
+        stop()
+        val childScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
+        this.scope = childScope
+
+        val health = observer.observe(params.probe)
+            .shareIn(childScope, SharingStarted.Eagerly, replay = 1)
+
+        health.onEach(::publishStats).launchIn(childScope)
+
+        health.filter { it.vpnActive }
+            .distinctUntilChangedBy { it.vpnUp }
+            .onEach { logVpnTransition(it) }
+            .launchIn(childScope)
+
+        health.filter { it.byedpiActive }
+            .distinctUntilChangedBy { it.byedpiUp }
+            .onEach { onByedpiTransition(it, params) }
+            .launchIn(childScope)
+
+        childScope.launch {
             var failures = 0
-            var wasByedpiUp = false
-            var prevVpnUp: Boolean? = null
-            var prevByedpiUp: Boolean? = null
-            while (isActive) {
-                val (vpnDelay, newVpnCountry) =
-                    probeChannel(
-                        engine.probeSocksPort,
-                        vpnCountry,
-                        VPN_PROBE_URL,
-                        engine.probeUsername,
-                        engine.probePassword
-                    )
-                vpnCountry = newVpnCountry
-
-                val (byedpiDelay, newByedpiCountry) =
-                    if (byeDpiPort != null)
-                        probeChannel(byeDpiPort, byedpiCountry, BYEDPI_PROBE_URL)
-                    else null to byedpiCountry
-
-                byedpiCountry = newByedpiCountry
-                val vpnUp = vpnDelay != null
-                val byedpiUp = byedpiDelay != null
-
-                if (byedpiUp && !wasByedpiUp) onByedpiUp()
-                wasByedpiUp = byedpiUp
-
-                val byedpiActive = byeDpiPort != null
-
-                if (vpnActive && vpnUp != prevVpnUp) {
-                    if (vpnUp) {
-                        val country = if (vpnCountry.isNotEmpty()) " $vpnCountry" else ""
-                        log.i(TAG, "vpn channel up (${vpnDelay}ms$country)")
-                    } else {
-                        log.w(TAG, "vpn channel down")
-                    }
-                    prevVpnUp = vpnUp
-                }
-                if (byedpiActive && byedpiUp != prevByedpiUp) {
-                    if (byedpiUp) log.i(TAG, "byedpi channel up (${byedpiDelay}ms)")
-                    else log.w(TAG, "byedpi channel down")
-                    prevByedpiUp = byedpiUp
-                }
-                val anyUp = vpnUp || byedpiUp
-                val allActiveUp = (!vpnActive || vpnUp) && (!byedpiActive || byedpiUp)
-                val fpError = isFingerprintError()
-
-                stateRepository.updateStats {
-                    it.copy(
-                        vpnUp = vpnUp,
-                        vpnLatencyMs = vpnDelay ?: 0,
-                        vpnCountry = vpnCountry,
-                        vpnCycling = vpnActive && !vpnUp && fpError,
-                        byedpiActive = byedpiActive,
-                        byedpiUp = byedpiUp,
-                        byedpiLatencyMs = byedpiDelay ?: 0,
-                        byedpiCountry = byedpiCountry
-                    )
-                }
-
-                if (allActiveUp) failures = 0 else failures++
-
-                if (anyUp) {
-                    stateRepository.update(VpnState.Connected(vpnDelay ?: byedpiDelay ?: 0))
-                } else {
-                    stateRepository.update(VpnState.Verifying)
-                }
-
-                if (!allActiveUp) {
-                    if (fpError) {
-                        onRecoveryReload()
-                    } else {
-                        if (failures % REFRESH_SUBSCRIPTION_AFTER_FAILURES == 0) onRefreshSubscription()
-                        if (failures % RELOAD_EVERY_N_FAILURES == 0) onRecoveryReload()
-                    }
-                }
-
-                val interval = if (allActiveUp && vpnUp) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS
-                delay(interval.milliseconds)
+            health.collect { snapshot ->
+                failures = if (snapshot.allActiveUp) 0 else failures + 1
+                if (!snapshot.allActiveUp) recover(failures, snapshot, params)
             }
         }
     }
 
     fun stop() {
-        job?.cancel()
-        job = null
+        scope?.cancel()
+        scope = null
         SocksProbe.close()
     }
 
-    private suspend fun probeChannel(
-        socksPort: Int,
-        currentCountry: String,
-        probeUrl: String,
-        username: String? = null,
-        password: String? = null
-    ): Pair<Int?, String> {
-        val delay = SocksProbe.latencyMs(socksPort, username, password, probeUrl)
-        val country = if (delay != null && currentCountry.isEmpty()) {
-            SocksProbe.resolveCountry(socksPort, username, password) ?: currentCountry
-        } else {
-            currentCountry
+    private fun publishStats(s: HealthSnapshot) {
+        stateRepository.updateStats {
+            it.copy(
+                vpnUp = s.vpnUp,
+                vpnLatencyMs = s.vpnDelayMs ?: 0,
+                vpnCountry = s.vpnCountry,
+                vpnCycling = s.vpnActive && !s.vpnUp && s.fpError,
+                byedpiActive = s.byedpiActive,
+                byedpiUp = s.byedpiUp,
+                byedpiLatencyMs = s.byedpiDelayMs ?: 0
+            )
         }
-        return delay to country
+        stateRepository.update(
+            if (s.anyUp) VpnState.Connected(s.vpnDelayMs ?: s.byedpiDelayMs ?: 0)
+            else VpnState.Verifying
+        )
+    }
+
+    private fun logVpnTransition(s: HealthSnapshot) {
+        if (s.vpnUp) {
+            val country = if (s.vpnCountry.isNotEmpty()) " ${s.vpnCountry}" else ""
+            log.i(TAG, "vpn channel up (${s.vpnDelayMs}ms$country)")
+        } else {
+            log.w(TAG, "vpn channel down")
+        }
+    }
+
+    private suspend fun onByedpiTransition(s: HealthSnapshot, params: HealthParams) {
+        if (s.byedpiUp) {
+            log.i(TAG, "byedpi channel up (${s.byedpiDelayMs}ms)")
+            params.onByedpiUp()
+        } else {
+            log.w(TAG, "byedpi channel down")
+        }
+    }
+
+    private suspend fun recover(failures: Int, s: HealthSnapshot, params: HealthParams) {
+        if (s.fpError) {
+            params.onRecoveryReload()
+            return
+        }
+        if (failures % REFRESH_SUBSCRIPTION_AFTER_FAILURES == 0) params.onRefreshSubscription()
+        if (failures % RELOAD_EVERY_N_FAILURES == 0) params.onRecoveryReload()
     }
 
     companion object {
         private const val TAG = "Health"
-        private const val HEALTH_INTERVAL_MS = 15_000L
-        private const val HEALTH_RETRY_MS = 3_000L
         private const val RELOAD_EVERY_N_FAILURES = 4
         private const val REFRESH_SUBSCRIPTION_AFTER_FAILURES = 3
-        private const val VPN_PROBE_URL = "https://www.gstatic.com/generate_204"
-        private const val BYEDPI_PROBE_URL = "https://www.youtube.com/generate_204"
     }
 }

@@ -1,6 +1,5 @@
 package io.github.yulbax.frkn.vpn.singbox
 
-import android.os.Build
 import libbox.ConnectionOwner
 import libbox.InterfaceUpdateListener
 import libbox.LocalDNSTransport
@@ -22,7 +21,7 @@ interface FrknPlatformInterface : PlatformInterface {
 
     override fun openTun(options: TunOptions): Int = error("openTun not implemented")
 
-    override fun useProcFS(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+    override fun useProcFS(): Boolean = false
 
     override fun findConnectionOwner(
         ipProtocol: Int,

@@ -5,33 +5,30 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yulbax.frkn.data.AppConfigBackup
-import io.github.yulbax.frkn.data.AppDao
-import io.github.yulbax.frkn.data.SettingsDao
+import io.github.yulbax.frkn.data.AppDatabase
 import io.github.yulbax.frkn.data.SettingsEntity
-import io.github.yulbax.frkn.data.profile.ProfileDao
+import io.github.yulbax.frkn.data.SettingsRepository
 import io.github.yulbax.frkn.engine.ByeDpi
 import io.github.yulbax.frkn.util.Diagnostics
 import io.github.yulbax.frkn.vpn.core.Ipv6Mode
 import io.github.yulbax.frkn.vpn.core.TlsFingerprint
 import io.github.yulbax.frkn.vpn.core.TunStack
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.koin.android.annotation.KoinViewModel
+import org.koin.core.annotation.KoinViewModel
 
 @KoinViewModel
 class SettingsViewModel(
     private val application: Application,
-    private val settingsDao: SettingsDao,
-    private val appDao: AppDao,
-    private val profileDao: ProfileDao
+    private val database: AppDatabase,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
-    private val settings: StateFlow<SettingsEntity> = settingsDao.observeSettings()
-        .map { it ?: SettingsEntity() }
+    private val settings: StateFlow<SettingsEntity> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsEntity())
 
     val byeDpiArgsDefault: String = ByeDpi.DEFAULT_DESYNC_ARGS.joinToString(" ")
@@ -54,9 +51,12 @@ class SettingsViewModel(
     fun setPreferredFingerprint(value: TlsFingerprint?) = update { it.copy(preferredFingerprint = value?.wire ?: "") }
     fun exportConfig(selection: Diagnostics.BackupSelection, onReady: (Uri) -> Unit) {
         viewModelScope.launch {
-            runCatching {
-                Diagnostics.exportConfig(application, appDao, settingsDao, profileDao, selection)
-            }.onSuccess(onReady)
+            try {
+                onReady(Diagnostics.exportConfig(application, database, selection))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -72,14 +72,13 @@ class SettingsViewModel(
         onResult: (Diagnostics.ImportResult) -> Unit
     ) {
         viewModelScope.launch {
-            onResult(Diagnostics.applyBackup(appDao, settingsDao, profileDao, backup, selection))
+            onResult(Diagnostics.applyBackup(database, backup, selection))
         }
     }
 
     private fun update(transform: (SettingsEntity) -> SettingsEntity) {
         viewModelScope.launch {
-            val current = settingsDao.observeSettings().first() ?: SettingsEntity()
-            settingsDao.upsertSettings(transform(current))
+            settingsRepository.update(transform)
         }
     }
 }

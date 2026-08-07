@@ -25,7 +25,7 @@ import io.github.yulbax.frkn.ui.components.ConnectionTypeIcon
 
 private val TYPE_ORDER = listOf(ConnectionType.DIRECT, ConnectionType.BYEDPI, ConnectionType.VPN)
 private val SELECTOR_HEIGHT = 48.dp
-private val APP_SELECTOR_HEIGHT = 36.dp
+private val APP_SELECTOR_HEIGHT = 48.dp
 private val APP_SELECTOR_WIDTH = 150.dp
 private val SELECTOR_ICON_WIDTH = 48.dp
 
