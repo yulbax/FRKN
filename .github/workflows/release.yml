@@ -162,8 +162,8 @@ jobs:
         with:
           packages: platform-tools
       - name: Android platform for KMP configuration
-        shell: bash
-        run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}"
+        shell: pwsh
+        run: sdkmanager --channel=3 "platforms;android-$env:ANDROID_COMPILE_SDK"
       - uses: gradle/actions/setup-gradle@v4
       - name: Desktop tests and MSI
         shell: bash
