@@ -1,8 +1,8 @@
 name: Release
 
-# On a push to main: read versionName from app/build.gradle.kts and, ONLY if the
+# On a push to main: read frkn.versionName from gradle.properties and, ONLY if the
 # matching tag doesn't exist yet (i.e. you bumped the version), build the FOSS release
-# APKs and cut a GitHub Release with the tag. Quality checks still run when the
+# APKs plus the Windows MSI and cut a GitHub Release with the tag. Quality checks still run when the
 # version is unchanged. Mirrors the GitLab pipeline (.gitlab-ci.yml).
 on:
   push:
@@ -38,8 +38,8 @@ jobs:
       - uses: actions/checkout@v5
       - id: v
         run: |
-          VERSION="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n1)"
-          [ -n "$VERSION" ] || { echo "versionName not found in app/build.gradle.kts"; exit 1; }
+          VERSION="$(sed -n 's/^frkn\.versionName=//p' gradle.properties | head -n1)"
+          [ -n "$VERSION" ] || { echo "frkn.versionName not found in gradle.properties"; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [ "$GITHUB_EVENT_NAME" != "push" ]; then
             echo "Pull request: quality checks only."
@@ -107,7 +107,7 @@ jobs:
       - run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${BUILD_TOOLS}" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests, Android Lint, and debug build
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+        run: ./gradlew testDebugUnitTest :shared:desktopTest :ui:desktopTest lintDebug assembleDebug --no-daemon
 
   # ── Build the release APKs (arm64 + x86_64 + armv7 + universal), signed. ─────────
   build:
@@ -149,9 +149,32 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           retention-days: 7
 
-  # ── Create the tag + GitHub Release with the four APKs attached. ─────────────────
+  windows:
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Android platform for KMP configuration
+        shell: bash
+        run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Desktop tests and MSI
+        shell: bash
+        run: ./gradlew -Pfrkn.desktopOnly :shared:desktopTest :ui:desktopTest :desktop:packageMsi --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msi
+          path: desktop/build/compose/binaries/main/msi/*.msi
+          retention-days: 7
+
+  # ── Create the tag + GitHub Release with the four APKs and the MSI attached. ─────────────────
   release:
-    needs: [check, build]
+    needs: [check, build, windows]
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -164,6 +187,10 @@ jobs:
         with:
           name: apks
           path: apks
+      - uses: actions/download-artifact@v4
+        with:
+          name: msi
+          path: msi
       - name: Generate changelog
         run: |
           VERSION="${{ needs.check.outputs.version }}"
@@ -188,4 +215,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: "FRKN v${{ needs.check.outputs.version }}"
           body_path: CHANGELOG.md
-          files: apks/*.apk
+          files: |
+            apks/*.apk
+            msi/*.msi

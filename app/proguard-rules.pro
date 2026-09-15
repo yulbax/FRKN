@@ -30,10 +30,5 @@
 -keep @androidx.room.Entity class io.github.yulbax.frkn.** { *; }
 -dontwarn androidx.room.paging.**
 
-# ───────────────────────── Ktor (engine resolved via reflection/ServiceLoader) ─────────────────────────
--keep class io.ktor.client.engine.android.** { *; }
--dontwarn io.ktor.**
--dontwarn org.slf4j.**
-
 # ───────────────────────── misc ─────────────────────────
 -dontwarn kotlinx.coroutines.**

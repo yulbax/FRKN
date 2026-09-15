@@ -24,5 +24,8 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "FRKN"
-include(":app")
+if (!providers.gradleProperty("frkn.desktopOnly").isPresent) include(":app")
+include(":shared")
+include(":ui")
+include(":desktop")
  
