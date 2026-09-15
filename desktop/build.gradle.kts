@@ -31,48 +31,46 @@ dependencies {
     testImplementation(libs.junit)
 }
 
-data class BundledBinary(val url: String, val sha256: String, val entries: Map<String, String>)
-
-val windowsBinaries = listOf(
-    BundledBinary(
-        url = "https://github.com/SagerNet/sing-box/releases/download/v$singBoxVersion/sing-box-$singBoxVersion-windows-amd64.zip",
-        sha256 = "6cbf90ec4ee87122ffce09b73928fb31e763bc1c75a119f79c61d24734c78807",
-        entries = mapOf(
-            "sing-box-$singBoxVersion-windows-amd64/sing-box.exe" to "sing-box.exe",
-            "sing-box-$singBoxVersion-windows-amd64/libcronet.dll" to "libcronet.dll",
-            "sing-box-$singBoxVersion-windows-amd64/LICENSE" to "sing-box-LICENSE.txt"
-        )
-    ),
-    BundledBinary(
-        url = "https://github.com/hufrea/byedpi/releases/download/v0.$byeDpiVersion/byedpi-$byeDpiVersion-x86_64-w64.zip",
-        sha256 = "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
-        entries = mapOf("ciadpi.exe" to "ciadpi.exe")
-    )
-)
-
 val bundledResourcesDir = layout.buildDirectory.dir("bundled-resources")
 
 val downloadWindowsBinaries = tasks.register("downloadWindowsBinaries") {
     group = "distribution"
     description = "Downloads the official sing-box and byedpi Windows releases bundled into the installer."
+    val singBoxFolder = "sing-box-$singBoxVersion-windows-amd64"
+    val archives: List<Triple<String, String, Map<String, String>>> = listOf(
+        Triple(
+            "https://github.com/SagerNet/sing-box/releases/download/v$singBoxVersion/$singBoxFolder.zip",
+            "6cbf90ec4ee87122ffce09b73928fb31e763bc1c75a119f79c61d24734c78807",
+            mapOf(
+                "$singBoxFolder/sing-box.exe" to "sing-box.exe",
+                "$singBoxFolder/libcronet.dll" to "libcronet.dll",
+                "$singBoxFolder/LICENSE" to "sing-box-LICENSE.txt"
+            )
+        ),
+        Triple(
+            "https://github.com/hufrea/byedpi/releases/download/v0.$byeDpiVersion/byedpi-$byeDpiVersion-x86_64-w64.zip",
+            "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
+            mapOf("ciadpi.exe" to "ciadpi.exe")
+        )
+    )
     val outputDir = bundledResourcesDir.map { it.dir("windows") }
+    inputs.property("archives", archives.toString())
     outputs.dir(outputDir)
     doLast {
         val target = outputDir.get().asFile.apply { mkdirs() }
-        windowsBinaries.forEach { binary ->
-            val bytes = URI(binary.url).toURL().openStream().use { it.readBytes() }
+        archives.forEach { (url, sha256, entries) ->
+            val bytes = URI(url).toURL().openStream().use { it.readBytes() }
             val actual = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-            check(actual == binary.sha256) { "Checksum mismatch for ${binary.url}: $actual" }
+            check(actual == sha256) { "Checksum mismatch for $url: $actual" }
             val found = mutableSetOf<String>()
             ZipInputStream(bytes.inputStream()).use { zip ->
                 generateSequence { zip.nextEntry }.forEach { entry ->
-                    val name = binary.entries[entry.name] ?: return@forEach
+                    val name = entries[entry.name] ?: return@forEach
                     File(target, name).writeBytes(zip.readBytes())
                     found += entry.name
                 }
             }
-            val required = binary.entries.keys.filterNot { it.endsWith(".dll") }
-            check(found.containsAll(required)) { "Missing ${required - found} in ${binary.url}" }
+            check(found.containsAll(entries.keys)) { "Missing ${entries.keys - found} in $url" }
         }
     }
 }
