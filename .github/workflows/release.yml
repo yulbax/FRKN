@@ -159,6 +159,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Android platform for KMP configuration
         shell: bash
         run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}"
