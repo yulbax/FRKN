@@ -72,6 +72,8 @@ jobs:
           cache: false
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Provision NDK + gomobile and build libbox
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
@@ -104,6 +106,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${BUILD_TOOLS}" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests, Android Lint, and debug build
@@ -125,6 +129,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${BUILD_TOOLS}" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
       - uses: gradle/actions/setup-gradle@v4
       - name: Decode release keystore
