@@ -1,7 +1,0 @@
-package io.github.yulbax.frkn.vpn.core
-
-import java.net.InetAddress
-import java.net.ServerSocket
-
-fun freeLoopbackPort(): Int =
-    ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }

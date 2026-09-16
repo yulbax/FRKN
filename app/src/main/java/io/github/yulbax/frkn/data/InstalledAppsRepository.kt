@@ -17,29 +17,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.koin.core.annotation.Single
 
-data class InstalledApp(
-    val packageName: String,
-    val name: String,
-    val isSystemApp: Boolean,
-    val isLaunchable: Boolean
-)
-
-@Single(createdAtStart = true)
+@Single(createdAtStart = true, binds = [InstalledAppsSource::class])
 class InstalledAppsRepository(
     context: Context,
     private val appDao: AppDao
-) {
+) : InstalledAppsSource {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
 
     private val _installedApps = MutableStateFlow<List<InstalledApp>>(emptyList())
-    val installedApps: StateFlow<List<InstalledApp>> = _installedApps.asStateFlow()
+    override val installedApps: StateFlow<List<InstalledApp>> = _installedApps.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    override val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    override val error: StateFlow<String?> = _error.asStateFlow()
 
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -68,7 +61,7 @@ class InstalledAppsRepository(
         sync()
     }
 
-    fun retry() {
+    override fun retry() {
         _isLoading.value = true
         _error.value = null
         sync()

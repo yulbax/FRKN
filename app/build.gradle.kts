@@ -7,7 +7,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.koin.compiler)
 }
@@ -54,7 +53,7 @@ android {
         minSdk = 29
         targetSdk = 37
         versionCode = 10202
-        versionName = "1.3.0"
+        versionName = providers.gradleProperty("frkn.versionName").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField(
@@ -123,10 +122,6 @@ android {
             excludes += "lib/x86/**"
         }
     }
-}
-
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 koinCompiler {
@@ -198,6 +193,8 @@ val renameReleaseApks = tasks.register("renameReleaseApks") {
 tasks.matching { it.name == "assembleRelease" }.configureEach { finalizedBy(renameReleaseApks) }
 
 dependencies {
+    implementation(project(":shared"))
+    implementation(project(":ui"))
     implementation(files("libs/libbox.aar"))
 
     implementation(platform(libs.androidx.compose.bom))
@@ -218,11 +215,8 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.core)
     implementation(libs.koin.annotations)
-    implementation(libs.ktor.client.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

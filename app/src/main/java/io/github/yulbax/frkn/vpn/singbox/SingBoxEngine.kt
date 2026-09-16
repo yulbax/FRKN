@@ -5,13 +5,14 @@ import android.util.Log
 import io.github.yulbax.frkn.vpn.DefaultNetworkMonitor
 import io.github.yulbax.frkn.vpn.core.EngineConfig
 import io.github.yulbax.frkn.vpn.core.EngineListener
+import io.github.yulbax.frkn.vpn.core.ProxyDelay
 import io.github.yulbax.frkn.vpn.core.TunAddress
 import io.github.yulbax.frkn.vpn.core.TunConfig
 import io.github.yulbax.frkn.vpn.core.TunPlatform
 import io.github.yulbax.frkn.vpn.core.VpnEngine
 import io.github.yulbax.frkn.vpn.core.freeLoopbackPort
+import io.github.yulbax.frkn.vpn.core.randomToken
 import io.github.yulbax.frkn.util.FrknLog
-import java.security.SecureRandom
 import libbox.CommandClient
 import libbox.CommandClientHandler
 import libbox.CommandClientOptions
@@ -63,6 +64,7 @@ class SingBoxEngine(
 
     override fun start(config: EngineConfig) {
         check(commandServer == null) { "sing-box engine is already started" }
+        networkMonitor.start()
         runCatching { boxLogFile.takeIf { it.exists() }?.writeText("") }
         val server = Libbox.newCommandServer(this, this)
         commandServer = server
@@ -102,6 +104,8 @@ class SingBoxEngine(
         runCatching { commandServer?.closeService() }
         runCatching { commandServer?.close() }
         commandServer = null
+        runCatching { networkMonitor.stop() }
+            .onFailure { log.w(TAG, "failed to stop network monitor", it) }
     }
 
     private fun buildConfig(config: EngineConfig): String =
@@ -124,7 +128,7 @@ class SingBoxEngine(
         }
 
         override fun writeGroups(groups: OutboundGroupIterator) {
-            val delays = mutableMapOf<String, Int>()
+            val delays = mutableMapOf<String, ProxyDelay>()
             while (groups.hasNext()) {
                 val group = groups.next()
                 if (group.tag != ConfigBuilder.PROXY_GROUP_TAG) continue
@@ -133,8 +137,8 @@ class SingBoxEngine(
                     val item = items.next()
                     when {
                         item.urlTestTime <= 0L -> Unit
-                        item.urlTestDelay <= 0 -> delays[item.tag] = DELAY_FAILED
-                        else -> delays[item.tag] = item.urlTestDelay
+                        item.urlTestDelay <= 0 -> delays[item.tag] = ProxyDelay.Failed
+                        else -> delays[item.tag] = ProxyDelay.Measured(item.urlTestDelay)
                     }
                 }
             }
@@ -242,12 +246,5 @@ class SingBoxEngine(
 
     private companion object {
         const val TAG = "SingBoxEngine"
-        const val DELAY_FAILED = -1
-
-        fun randomToken(): String {
-            val bytes = ByteArray(12)
-            SecureRandom().nextBytes(bytes)
-            return bytes.joinToString("") { "%02x".format(it) }
-        }
     }
 }

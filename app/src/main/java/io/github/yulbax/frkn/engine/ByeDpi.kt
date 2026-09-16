@@ -1,6 +1,7 @@
 package io.github.yulbax.frkn.engine
 
-import android.util.Log
+import io.github.yulbax.frkn.util.FrknLog
+import io.github.yulbax.frkn.vpn.core.ByeDpiArgs
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
@@ -8,10 +9,11 @@ import kotlin.concurrent.thread
 const val BYEDPI_VERSION = "17.3"
 
 class ByeDpi(
+    private val log: FrknLog,
     private val host: String = DEFAULT_HOST,
     private val port: Int = DEFAULT_PORT,
     private val protectPath: String? = null,
-    private val extraArgs: List<String> = DEFAULT_DESYNC_ARGS,
+    private val extraArgs: List<String> = ByeDpiArgs.DEFAULT,
     private val onUnexpectedExit: ((Int) -> Unit)? = null
 ) {
     private val running = AtomicBoolean(false)
@@ -35,14 +37,13 @@ class ByeDpi(
             running.set(true)
             activeInstance = this
             val newWorker = thread(start = false, name = "byedpi") {
-                Log.i(TAG, "byedpi starting on $host:$port args=${args.joinToString(" ")}")
                 val code = try {
                     nativeStart(args)
                 } catch (t: Throwable) {
-                    Log.e(TAG, "byedpi native worker failed", t)
+                    log.e(TAG, "byedpi native worker failed", t)
                     -1
                 }
-                Log.i(TAG, "byedpi exited with code $code")
+                log.i(TAG, "byedpi exited with code $code")
                 val unexpected = synchronized(LIFECYCLE_LOCK) {
                     running.set(false)
                     worker = null
@@ -92,27 +93,6 @@ class ByeDpi(
         private const val TAG = "ByeDpi"
         private val LIFECYCLE_LOCK = Any()
         private var activeInstance: ByeDpi? = null
-
-        val DEFAULT_DESYNC_ARGS = listOf(
-            "-d1", "-s1+s", "-s3+s", "-s6+s", "-s9+s", "-s12+s", "-s15+s", "-s20+s", "-s30+s", "-a1"
-        )
-
-        fun parseArgs(line: String): List<String> {
-            if (line.isBlank()) return DEFAULT_DESYNC_ARGS
-            val tokens = mutableListOf<String>()
-            val sb = StringBuilder()
-            var quote = ' '
-            for (c in line) {
-                when {
-                    quote != ' ' -> if (c == quote) quote = ' ' else sb.append(c)
-                    c == '"' || c == '\'' -> quote = c
-                    c.isWhitespace() -> if (sb.isNotEmpty()) { tokens.add(sb.toString()); sb.clear() }
-                    else -> sb.append(c)
-                }
-            }
-            if (sb.isNotEmpty()) tokens.add(sb.toString())
-            return if (tokens.isEmpty()) DEFAULT_DESYNC_ARGS else tokens
-        }
 
         init {
             System.loadLibrary("byedpi")
