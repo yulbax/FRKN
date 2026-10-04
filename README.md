@@ -105,7 +105,7 @@ The installer itself must be built on Windows with JDK 21:
 ### Linux
 
 One script builds the service, the app and the `.deb`, `.rpm` and Arch packages with
-[nFPM](https://nfpm.goreleaser.com) (`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0`):
+[nFPM](https://nfpm.goreleaser.com) 2.47 ([prebuilt binaries](https://github.com/goreleaser/nfpm/releases/tag/v2.47.0)):
 
 ```bash
 bash scripts/build-linux-packages.sh          # FORMATS="archlinux" for just one

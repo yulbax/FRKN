@@ -9,8 +9,8 @@ VERSION="$(sed -n 's/^frkn\.versionName=//p' "$REPO_ROOT/gradle.properties" | he
 FORMATS="${FORMATS:-deb rpm archlinux}"
 STAGE="$REPO_ROOT/desktop/build/linux-stage"
 OUT="$REPO_ROOT/desktop/build/linux-packages"
-NFPM="${NFPM:-$(command -v nfpm || echo "$(go env GOPATH)/bin/nfpm")}"
-[ -x "$NFPM" ] || { echo "nfpm not found (go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0)" >&2; exit 1; }
+NFPM="${NFPM:-$(command -v nfpm || echo "$(go env GOPATH 2>/dev/null)/bin/nfpm")}"
+[ -x "$NFPM" ] || { echo "nfpm not found: install it from https://github.com/goreleaser/nfpm/releases/tag/v2.47.0" >&2; exit 1; }
 
 if [ "${SKIP_CORE:-0}" != "1" ]; then
   CORE_TARGETS=linux bash "$REPO_ROOT/scripts/build-libbox.sh"

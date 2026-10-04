@@ -21,6 +21,8 @@ env:
   SING_BOX_TAG: "v1.260910.0"
   LIBBOX_CACHE_REV: "10"    # bump to force a fresh libbox.aar rebuild (busts the cache)
   GO_VERSION: "1.25.0"
+  NFPM_VERSION: "2.47.0"
+  NFPM_SHA256: "0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783"
   NDK_VERSION: "28.0.13004108"
   ANDROID_COMPILE_SDK: "37.0"
   BUILD_TOOLS: "36.1.0"
@@ -210,20 +212,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
       - name: Android platform for KMP configuration
         run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Install nFPM
+        run: |
+          curl -fsSL -o nfpm.tar.gz "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "${NFPM_SHA256}  nfpm.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/nfpm" && tar -xzf nfpm.tar.gz -C "$RUNNER_TEMP/nfpm" nfpm && rm nfpm.tar.gz
+          echo "$RUNNER_TEMP/nfpm" >> "$GITHUB_PATH"
       - name: Linux packages
         run: |
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
-          export PATH="$(go env GOPATH)/bin:$PATH"
           chmod +x desktop/libs/linux/frkn-service
           SKIP_CORE=1 bash scripts/build-linux-packages.sh
       - uses: actions/upload-artifact@v4
