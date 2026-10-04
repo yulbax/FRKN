@@ -75,12 +75,12 @@ fun FrameWindowScope.WindowFrame(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun FrameWindowScope.CaptionButtons(onClose: () -> Unit) {
+fun CaptionButtons(onMinimize: () -> Unit, onClose: () -> Unit) {
     Row(
         modifier = Modifier.padding(start = 8.dp, end = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        CaptionButton(Icons.Filled.Remove, PastelYellow) { window.isMinimized = true }
+        CaptionButton(Icons.Filled.Remove, PastelYellow, onMinimize)
         CaptionButton(Icons.Filled.Close, PastelRed, onClose)
     }
 }

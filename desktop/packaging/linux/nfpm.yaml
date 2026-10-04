@@ -1,0 +1,51 @@
+name: frkn
+arch: amd64
+platform: linux
+version: ${FRKN_VERSION}
+release: 1
+section: net
+priority: optional
+maintainer: yulbax <yulbax@users.noreply.github.com>
+description: Per-app split VPN with ByeDPI, built on sing-box.
+vendor: yulbax
+homepage: https://github.com/yulbax/FRKN
+license: GPL-3.0-only
+
+contents:
+  - src: ${FRKN_APP_DIR}
+    dst: /opt/frkn
+    type: tree
+  - src: /opt/frkn/bin/FRKN
+    dst: /usr/bin/frkn
+    type: symlink
+  - src: ./frkn.service
+    dst: /usr/lib/systemd/system/frkn.service
+  - src: ./frkn.desktop
+    dst: /usr/share/applications/frkn.desktop
+  - src: ${FRKN_ICON}
+    dst: /usr/share/icons/hicolor/256x256/apps/frkn.png
+  - src: ${FRKN_LICENSE}
+    dst: /usr/share/licenses/frkn/LICENSE
+
+scripts:
+  postinstall: ./scripts/postinstall.sh
+  preremove: ./scripts/preremove.sh
+  postremove: ./scripts/postremove.sh
+
+overrides:
+  deb:
+    depends: [systemd, libx11-6, libxext6, libxrender1, libxtst6, libxi6, fontconfig, libfreetype6, libharfbuzz0b, liblcms2-2, libgl1]
+  rpm:
+    depends: [systemd, libX11, libXext, libXrender, libXtst, libXi, fontconfig, freetype, harfbuzz, lcms2, libglvnd-glx]
+  archlinux:
+    depends: [systemd, libx11, libxext, libxrender, libxtst, libxi, fontconfig, freetype2, harfbuzz, lcms2, libglvnd]
+
+deb:
+  compression: zstd
+
+rpm:
+  compression: zstd
+
+archlinux:
+  scripts:
+    postupgrade: ./scripts/postinstall.sh

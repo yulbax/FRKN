@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=FRKN
+Comment=Per-app split VPN with ByeDPI
+Exec=/opt/frkn/bin/FRKN
+Icon=frkn
+Categories=Network;
+Terminal=false
+StartupWMClass=io-github-yulbax-frkn-desktop-MainKt

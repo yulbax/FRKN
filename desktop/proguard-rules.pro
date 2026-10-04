@@ -29,3 +29,7 @@
 -dontwarn androidx.room.paging.**
 -dontwarn org.slf4j.**
 -dontnote **
+
+-keep class com.kdroid.composetray.** { *; }
+-dontwarn com.kdroid.**
+-dontwarn io.github.kdroidfilter.**

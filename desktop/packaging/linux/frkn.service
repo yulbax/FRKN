@@ -1,0 +1,16 @@
+[Unit]
+Description=FRKN VPN service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/frkn/lib/app/resources/frkn-service run
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=frkn
+RuntimeDirectoryMode=0755
+StateDirectory=frkn
+StateDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

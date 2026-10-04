@@ -1,5 +1,6 @@
 import java.net.URI
 import java.security.MessageDigest
+import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -28,6 +29,7 @@ dependencies {
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.jna)
+    implementation(libs.compose.native.tray)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.jetbrains.compose.material.icons.extended)
     testImplementation(libs.junit)
@@ -35,44 +37,76 @@ dependencies {
 
 val bundledResourcesDir = layout.buildDirectory.dir("bundled-resources")
 
-val windowsCoreDir = layout.projectDirectory.dir("libs/windows")
-
-val prepareWindowsBinaries = tasks.register("prepareWindowsBinaries") {
+fun registerBundledBinaries(
+    os: String,
+    executableSuffix: String,
+    archiveName: String,
+    archiveSha256: String,
+    archiveEntry: String
+) = tasks.register("prepare${os.replaceFirstChar { it.uppercase() }}Binaries") {
     group = "distribution"
-    description = "Bundles the Amnezia sing-box core built by scripts/build-libbox.sh and the official byedpi release."
-    val byeDpiArchive = Triple(
-        "https://github.com/hufrea/byedpi/releases/download/v0.$byeDpiVersion/byedpi-$byeDpiVersion-x86_64-w64.zip",
-        "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
-        mapOf("ciadpi.exe" to "ciadpi.exe")
-    )
-    val coreFiles = listOf("frkn-service.exe", "sing-box-LICENSE.txt").map { windowsCoreDir.file(it).asFile }
-    val outputDir = bundledResourcesDir.map { it.dir("windows") }
-    inputs.property("byeDpiArchive", byeDpiArchive.toString())
+    description = "Bundles frkn-service built by scripts/build-libbox.sh and the official byedpi release for $os."
+    val archiveUrl = "https://github.com/hufrea/byedpi/releases/download/v0.$byeDpiVersion/$archiveName"
+    val coreFiles = listOf("frkn-service$executableSuffix", "sing-box-LICENSE.txt")
+        .map { layout.projectDirectory.dir("libs/$os").file(it).asFile }
+    val outputDir = bundledResourcesDir.map { it.dir(os) }
+    val ciadpiName = "ciadpi$executableSuffix"
+    inputs.property("byeDpiArchive", "$archiveUrl $archiveSha256 $archiveEntry")
     inputs.files(coreFiles).withPropertyName("core").optional()
     outputs.dir(outputDir)
     doLast {
+        fun unzipEntry(archive: ByteArray, name: String): ByteArray? = ZipInputStream(archive.inputStream()).use { zip ->
+            generateSequence { zip.nextEntry }.firstOrNull { it.name == name }?.let { zip.readBytes() }
+        }
+
+        fun untarEntry(archive: ByteArray, name: String): ByteArray? {
+            val tar = GZIPInputStream(archive.inputStream()).use { it.readBytes() }
+            var offset = 0
+            while (offset + 512 <= tar.size) {
+                val header = tar.copyOfRange(offset, offset + 512)
+                val entryName = header.copyOfRange(0, 100).decodeToString().trimEnd('\u0000')
+                if (entryName.isEmpty()) return null
+                val size = header.copyOfRange(124, 136).decodeToString().trim('\u0000', ' ').toLong(8).toInt()
+                val data = offset + 512
+                if (entryName.removePrefix("./") == name) return tar.copyOfRange(data, data + size)
+                offset = data + (size + 511) / 512 * 512
+            }
+            return null
+        }
+
         val missing = coreFiles.filterNot { it.isFile }
         check(missing.isEmpty()) {
-            "Missing ${missing.joinToString { it.name }} in desktop/libs/windows. " +
-                "Run CORE_TARGETS=windows scripts/build-libbox.sh first."
+            "Missing ${missing.joinToString { it.name }} in desktop/libs/$os. " +
+                "Run CORE_TARGETS=$os scripts/build-libbox.sh first."
         }
         val target = outputDir.get().asFile.apply { mkdirs() }
-        coreFiles.forEach { it.copyTo(File(target, it.name), overwrite = true) }
-        val (url, sha256, entries) = byeDpiArchive
-        val bytes = URI(url).toURL().openStream().use { it.readBytes() }
+        coreFiles.forEach { it.copyTo(File(target, it.name), overwrite = true).setExecutable(true) }
+        val bytes = URI(archiveUrl).toURL().openStream().use { it.readBytes() }
         val actual = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        check(actual == sha256) { "Checksum mismatch for $url: $actual" }
-        val found = mutableSetOf<String>()
-        ZipInputStream(bytes.inputStream()).use { zip ->
-            generateSequence { zip.nextEntry }.forEach { entry ->
-                val name = entries[entry.name] ?: return@forEach
-                File(target, name).writeBytes(zip.readBytes())
-                found += entry.name
-            }
+        check(actual == archiveSha256) { "Checksum mismatch for $archiveUrl: $actual" }
+        val ciadpi = if (archiveName.endsWith(".zip")) unzipEntry(bytes, archiveEntry) else untarEntry(bytes, archiveEntry)
+        File(target, ciadpiName).apply {
+            writeBytes(checkNotNull(ciadpi) { "Missing $archiveEntry in $archiveUrl" })
+            setExecutable(true)
         }
-        check(found.containsAll(entries.keys)) { "Missing ${entries.keys - found} in $url" }
     }
 }
+
+val prepareWindowsBinaries = registerBundledBinaries(
+    os = "windows",
+    executableSuffix = ".exe",
+    archiveName = "byedpi-$byeDpiVersion-x86_64-w64.zip",
+    archiveSha256 = "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
+    archiveEntry = "ciadpi.exe"
+)
+
+val prepareLinuxBinaries = registerBundledBinaries(
+    os = "linux",
+    executableSuffix = "",
+    archiveName = "byedpi-$byeDpiVersion-x86_64.tar.gz",
+    archiveSha256 = "98f73c32eacb571ebd88d790f6376ed9e70f02d44c1fe862472ecea75cd7117d",
+    archiveEntry = "ciadpi-x86_64"
+)
 
 compose.desktop {
     application {
@@ -104,6 +138,10 @@ compose.desktop {
             }
         }
     }
+}
+
+if (System.getProperty("os.name").startsWith("Linux")) {
+    tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(prepareLinuxBinaries) }
 }
 
 if (System.getProperty("os.name").startsWith("Windows")) {

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/md5"
 	"errors"
+	"net/netip"
 	"strings"
 	"unsafe"
 
@@ -15,6 +16,11 @@ var netClassGUID = windows.GUID{Data1: 0x4d36e972, Data2: 0xe325, Data3: 0x11ce,
 func wintunGUID(name string) windows.GUID {
 	sum := md5.Sum([]byte("wintun" + name))
 	return *(*windows.GUID)(unsafe.Pointer(&sum[0]))
+}
+
+func releaseAdapter(name string, _ []netip.Prefix) error {
+	_, err := removeStaleAdapter(name)
+	return err
 }
 
 func removeStaleAdapter(name string) (int, error) {

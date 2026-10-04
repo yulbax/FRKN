@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -22,9 +23,15 @@ import (
 )
 
 type instance struct {
-	box    *box.Box
-	ctx    context.Context
-	cancel context.CancelFunc
+	box      *box.Box
+	ctx      context.Context
+	cancel   context.CancelFunc
+	adapters []tunDevice
+}
+
+type tunDevice struct {
+	name      string
+	addresses []netip.Prefix
 }
 
 type engine struct {
@@ -68,7 +75,7 @@ func create(content string, prepare func(option.Options) error) (*instance, erro
 		cancel()
 		return nil, err
 	}
-	return &instance{box: created, ctx: ctx, cancel: cancel}, nil
+	return &instance{box: created, ctx: ctx, cancel: cancel, adapters: tunAdapters(options)}, nil
 }
 
 func (i *instance) close() error {
@@ -77,20 +84,31 @@ func (i *instance) close() error {
 	go func() { done <- i.box.Close() }()
 	select {
 	case err := <-done:
+		for _, tun := range i.adapters {
+			_ = releaseAdapter(tun.name, tun.addresses)
+		}
 		return err
 	case <-time.After(C.FatalStopTimeout):
 		return errors.New("sing-box did not close in time")
 	}
 }
 
-func removeStaleAdapters(options option.Options) error {
+func tunAdapters(options option.Options) []tunDevice {
+	var adapters []tunDevice
 	for _, inbound := range options.Inbounds {
 		tun, isTun := inbound.Options.(*option.TunInboundOptions)
 		if !isTun || tun.InterfaceName == "" {
 			continue
 		}
-		if _, err := removeStaleAdapter(tun.InterfaceName); err != nil {
-			return E.Cause(err, "remove stale adapter ", tun.InterfaceName)
+		adapters = append(adapters, tunDevice{name: tun.InterfaceName, addresses: tun.Address})
+	}
+	return adapters
+}
+
+func releaseAdapters(options option.Options) error {
+	for _, tun := range tunAdapters(options) {
+		if err := releaseAdapter(tun.name, tun.addresses); err != nil {
+			return E.Cause(err, "release adapter ", tun.name)
 		}
 	}
 	return nil
@@ -111,7 +129,7 @@ func (e *engine) start(config string) error {
 	if e.current != nil {
 		return errors.New("sing-box is already running")
 	}
-	started, err := create(config, removeStaleAdapters)
+	started, err := create(config, releaseAdapters)
 	if err != nil {
 		return err
 	}

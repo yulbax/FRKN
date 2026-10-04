@@ -4,7 +4,7 @@
 
 # FRKN
 
-**A per-app split VPN for Android and Windows.**
+**A per-app split VPN for Android, Windows and Linux.**
 
 </div>
 
@@ -14,7 +14,7 @@ DPI-bypass engine, or straight out untouched. All three can run at the same time
 
 ## Download
 
-Get the latest APKs and the Windows installer from
+Get the latest APKs, the Windows installer and the Linux packages from
 [Releases](https://github.com/yulbax/FRKN/releases/latest).
 
 - **Android** — `FRKN-<version>-arm64-v8a.apk` fits almost every modern phone;
@@ -23,6 +23,11 @@ Get the latest APKs and the Windows installer from
   install the newer MSI over the old one; settings and servers are kept.
   The tunnel runs in the FRKN background service, which the installer sets up, so the app
   itself never asks for administrator rights.
+- **Linux** — `FRKN-<version>-amd64.deb` (Debian, Ubuntu), `FRKN-<version>-x86_64.rpm`
+  (Fedora, openSUSE) or `FRKN-<version>-x86_64.pkg.tar.zst` (Arch), x86_64. The package
+  installs and enables the `frkn.service` systemd unit, so the app runs as a normal user. The window uses X11, so on
+  Wayland it runs through XWayland. Minimize-to-tray needs a StatusNotifierItem tray
+  (KDE, waybar, GNOME with the AppIndicator extension).
 
 ## Features
 
@@ -36,8 +41,9 @@ Get the latest APKs and the Windows installer from
   WireGuard / AmneziaWG `.conf` files, or a subscription URL.
 - **Modern transports.** TCP, WebSocket, gRPC, HTTP and HTTPUpgrade, with TLS / Reality
   and configurable uTLS fingerprints.
-- **Windows extras.** Apps are matched by process name; an optional mode sends all
-  traffic that has no explicit rule through the VPN.
+- **Desktop extras.** On Windows and Linux apps are matched by process name; an optional
+  mode sends all traffic that has no explicit rule through the VPN. Closing the window while
+  connected asks first, and minimizing hides FRKN to the system tray.
 - **Stays out of the way.** No system-wide proxy, no exposed control API, optional
   auto-connect, and a built-in connection health check.
 
@@ -49,8 +55,10 @@ FRKN combines two engines behind a single tunnel interface:
   upstream server, *ByeDPI* apps to the local bypass proxy, *Direct* apps straight out.
   FRKN uses [amnezia-box](https://github.com/amnezia-vpn/amnezia-box), the Amnezia fork
   of [sing-box](https://github.com/SagerNet/sing-box) that adds AmneziaWG. The same core
-  runs on both platforms: as a Go Mobile library inside the app on Android and as the
-  `frkn-service` background service on Windows.
+  runs everywhere: as a Go Mobile library inside the app on Android, and as the
+  `frkn-service` background service (a Windows service or a systemd unit) on the desktop.
+  The desktop app talks to it over a local socket; if the app goes away, the service tears
+  the tunnel down.
 - **[ByeDPI](https://github.com/hufrea/byedpi)** runs as a local proxy that
   desynchronizes packets to slip past Deep Packet Inspection.
 
@@ -94,12 +102,26 @@ The installer itself must be built on Windows with JDK 21:
 
 `-Pfrkn.desktopOnly` skips the Android modules, so no Android SDK is needed there.
 
+### Linux
+
+One script builds the service, the app and the `.deb`, `.rpm` and Arch packages with
+[nFPM](https://nfpm.goreleaser.com) (`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0`):
+
+```bash
+bash scripts/build-linux-packages.sh          # FORMATS="archlinux" for just one
+sudo pacman -U desktop/build/linux-packages/FRKN-<version>-x86_64.pkg.tar.zst
+```
+
+The packages install to `/opt/frkn` and ship `frkn.service`; removing the package stops
+and removes the service again.
+
 ## Built with
 
 - [amnezia-box](https://github.com/amnezia-vpn/amnezia-box) /
   [sing-box](https://github.com/SagerNet/sing-box) — the VPN core
 - [ByeDPI](https://github.com/hufrea/byedpi) — the DPI-bypass engine
-- Kotlin Multiplatform, Compose Multiplatform, Room, Koin, JNA
+- Kotlin Multiplatform, Compose Multiplatform, Room, Koin, JNA,
+  [ComposeNativeTray](https://github.com/kdroidfilter/ComposeNativeTray)
 
 ## License
 

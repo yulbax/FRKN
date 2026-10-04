@@ -14,7 +14,7 @@
 #   SING_BOX_REPO   clone URL
 #   LIBBOX_WORK_DIR scratch dir for the sing-box checkout (default <repo>/.libbox-build)
 #   FORCE_REBUILD=1 build even if app/libs/libbox.aar already exists
-#   CORE_TARGETS    any of: android windows linux     (default "android windows")
+#   CORE_TARGETS    any of: android windows linux     (default: all three)
 #
 # On a sing-box bump the only thing that can break is the stub below: if upstream
 # changes the ShellSession interface / OpenNative*Session signatures, the build (or
@@ -35,7 +35,7 @@ OUT_WINDOWS_SERVICE="${OUT_WINDOWS_DIR}/frkn-service.exe"
 OUT_LINUX_SERVICE="${REPO_ROOT}/desktop/libs/linux/frkn-service"
 DESKTOP_SERVICE_SRC="${REPO_ROOT}/desktop/service"
 APP_VERSION="$(sed -n 's/^frkn\.versionName=//p' "${REPO_ROOT}/gradle.properties" | head -n1)"
-CORE_TARGETS="${CORE_TARGETS:-android windows}"
+CORE_TARGETS="${CORE_TARGETS:-android windows linux}"
 
 # FULL upstream Android libbox feature set (cmd/internal/build_libbox sharedTags)
 # minus only with_tailscale, plus with_awg (AmneziaWG, only known to the Amnezia

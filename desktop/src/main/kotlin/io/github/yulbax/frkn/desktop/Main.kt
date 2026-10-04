@@ -10,12 +10,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
-import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberWindowState
+import com.kdroid.composetray.tray.api.Tray
 import io.github.yulbax.frkn.data.SettingsRepository
 import io.github.yulbax.frkn.data.profile.ProfileRepository
 import io.github.yulbax.frkn.ui.components.ExitConfirmDialog
@@ -62,13 +61,15 @@ fun main() {
             state.isMinimized = false
         }
 
-        if (isTraySupported) {
+        if (TraySupport.isAvailable) {
             val labels = trayLabels()
+            @Suppress("DEPRECATION")
             Tray(
-                icon = icon,
+                iconPath = resourceUrl(APP_ICON),
+                windowsIconPath = resourceUrl(TRAY_ICON_WINDOWS),
                 tooltip = "FRKN",
-                onAction = show,
-                menu = {
+                primaryAction = show,
+                menuContent = {
                     Item(labels.open, onClick = show)
                     Item(labels.exit, onClick = requestExit)
                 }
@@ -92,7 +93,7 @@ fun main() {
                 if (state.placement != WindowPlacement.Floating) state.placement = WindowPlacement.Floating
             }
             LaunchedEffect(state.isMinimized) {
-                if (state.isMinimized && isTraySupported) {
+                if (state.isMinimized && TraySupport.isAvailable) {
                     visible = false
                     state.isMinimized = false
                 }
@@ -104,13 +105,18 @@ fun main() {
                 WindowFrame {
                     MainScreen(
                         topBarFrame = { bar -> WindowDraggableArea { bar() } },
-                        topBarActions = { CaptionButtons(onClose = requestExit) }
+                        topBarActions = {
+                            CaptionButtons(
+                                onMinimize = { if (TraySupport.isAvailable) visible = false else state.isMinimized = true },
+                                onClose = requestExit
+                            )
+                        }
                     )
                 }
                 if (confirmExit) {
                     ExitConfirmDialog(
                         onExit = exit,
-                        onMinimizeToTray = if (isTraySupported) {
+                        onMinimizeToTray = if (TraySupport.isAvailable) {
                             {
                                 confirmExit = false
                                 visible = false
@@ -126,11 +132,15 @@ fun main() {
     }
 }
 
+private fun resourceUrl(name: String): String =
+    checkNotNull(Thread.currentThread().contextClassLoader.getResource(name)) { "missing $name" }.toString()
+
 private fun appIconBytes(): ByteArray =
     checkNotNull(Thread.currentThread().contextClassLoader.getResourceAsStream(APP_ICON)) { "missing $APP_ICON" }
         .use { it.readBytes() }
 
 private const val APP_ICON = "frkn-icon.png"
+private const val TRAY_ICON_WINDOWS = "frkn-icon.ico"
 
 private fun autoConnect(settings: SettingsRepository, profiles: ProfileRepository, launcher: VpnLauncher) {
     val shouldConnect = runBlocking { settings.settings.first().autoConnect && profiles.selected.first() != null }

@@ -19,7 +19,7 @@ concurrency:
 
 env:
   SING_BOX_TAG: "v1.260910.0"
-  LIBBOX_CACHE_REV: "9"    # bump to force a fresh libbox.aar rebuild (busts the cache)
+  LIBBOX_CACHE_REV: "10"    # bump to force a fresh libbox.aar rebuild (busts the cache)
   GO_VERSION: "1.25.0"
   NDK_VERSION: "28.0.13004108"
   ANDROID_COMPILE_SDK: "37.0"
@@ -66,6 +66,7 @@ jobs:
           path: |
             app/libs/libbox.aar
             desktop/libs/windows
+            desktop/libs/linux
           key: libbox-${{ env.SING_BOX_TAG }}-${{ env.LIBBOX_CACHE_REV }}-${{ hashFiles('desktop/service/**', 'scripts/build-libbox.sh', 'gradle.properties') }}
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-go@v5
@@ -97,6 +98,11 @@ jobs:
         with:
           name: windows-core
           path: desktop/libs/windows
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-core
+          path: desktop/libs/linux
           retention-days: 1
 
   quality:
@@ -191,9 +197,44 @@ jobs:
           path: desktop/build/compose/binaries/main-release/msi/*.msi
           retention-days: 7
 
+  linux:
+    needs: [check, libbox]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-core
+          path: desktop/libs/linux
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Android platform for KMP configuration
+        run: sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Linux packages
+        run: |
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          chmod +x desktop/libs/linux/frkn-service
+          SKIP_CORE=1 bash scripts/build-linux-packages.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: desktop/build/linux-packages/*
+          retention-days: 7
+
   # ── Create the tag + GitHub Release with the four APKs and the MSI attached. ─────────────────
   release:
-    needs: [check, build, windows]
+    needs: [check, build, windows, linux]
     if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -210,6 +251,10 @@ jobs:
         with:
           name: msi
           path: msi
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-packages
+          path: linux
       - name: Generate changelog
         run: |
           VERSION="${{ needs.check.outputs.version }}"
@@ -237,3 +282,4 @@ jobs:
           files: |
             apks/*.apk
             msi/*.msi
+            linux/*
