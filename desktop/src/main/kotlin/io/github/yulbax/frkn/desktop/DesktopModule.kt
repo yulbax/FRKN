@@ -46,8 +46,16 @@ val desktopModule = module {
     single { VpnStateRepository() }
     single { VpnCommandBus() }
     single<ByeDpiSiteProbe> { SocksSiteProbe }
-    single<DiagnosticsSource> { DesktopDiagnostics(get(), DesktopPaths.workDir, get(), get()) }
-    single { SingBoxCore(DesktopPaths.singBoxCore) }
+    single<DiagnosticsSource> { DesktopDiagnostics(get(), get(), get(), get()) }
+    single {
+        DesktopService(
+            socket = DesktopPaths.serviceSocket,
+            bundled = DesktopPaths.serviceBinary,
+            appDir = DesktopPaths.installDir,
+            expectedVersion = System.getProperty("frkn.version"),
+            log = get()
+        )
+    }
     single<VersionInfo> { DesktopVersionInfo(get()) }
     single<InstalledAppsSource>(createdAtStart = true) {
         ProcessInstalledApps(get(), DesktopPaths.ownExecutable, CoroutineScope(SupervisorJob() + Dispatchers.IO))
@@ -59,9 +67,8 @@ val desktopModule = module {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         VpnController(scope, get(), stateRepository, DesktopHost, log) { controller ->
             VpnSession(
-                engine = EmbeddedSingBoxEngine(
-                    core = get(),
-                    workDir = DesktopPaths.workDir,
+                engine = ServiceEngine(
+                    service = get(),
                     directProcesses = listOf(DesktopPaths.ciadpi.name),
                     delayProbeUrl = ProbeUrls.VPN,
                     listener = controller,
@@ -80,5 +87,5 @@ val desktopModule = module {
             )
         }
     }
-    single<VpnLauncher> { DesktopVpnLauncher(get(), get(), get()) }
+    single<VpnLauncher> { DesktopVpnLauncher(get()) }
 }

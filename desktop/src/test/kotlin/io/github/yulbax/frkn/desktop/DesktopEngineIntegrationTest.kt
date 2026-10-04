@@ -34,20 +34,31 @@ import kotlin.time.Duration.Companion.seconds
 class DesktopEngineIntegrationTest {
     private val binDir = System.getenv("FRKN_TEST_BIN_DIR")?.let(::File)
     private val workDir = Files.createTempDirectory("frkn-desktop-test").toFile()
-    private val core by lazy { SingBoxCore(File(binDir, "libfrkn-core.so")) }
+    private val processes = mutableListOf<Process>()
 
     @Before
     fun requireBinaries() {
-        assumeTrue("set FRKN_TEST_BIN_DIR to a directory with libfrkn-core.so and ciadpi", binDir?.isDirectory == true)
+        assumeTrue("set FRKN_TEST_BIN_DIR to a directory with frkn-service and ciadpi", binDir?.isDirectory == true)
     }
 
     @After
     fun cleanup() {
+        processes.forEach { it.destroy(); it.waitFor(10, TimeUnit.SECONDS) }
         workDir.deleteRecursively()
     }
 
+    private fun startService(): File {
+        val socket = File(workDir, "s.sock")
+        processes += ProcessBuilder(File(binDir, "frkn-service").absolutePath, "run", "--socket", socket.absolutePath, "--work-dir", File(workDir, "svc").absolutePath)
+            .redirectErrorStream(true).redirectOutput(File(workDir, "service.log")).start()
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (!socket.exists() && System.nanoTime() < deadline) Thread.sleep(50)
+        assertTrue("service socket did not appear", socket.exists())
+        return socket
+    }
+
     @Test
-    fun windowsStyleConfigPassesCoreCheck() {
+    fun windowsStyleConfigPassesServiceCheck() {
         val config = ConfigBuilder.build(
             proxies = listOf(EngineProxy("p1", """{"type":"vless","server":"a.example","server_port":443,"uuid":"b5e6f6c2-6f5e-4c57-9a1c-1a9a2e2c3d4e","tls":{"enabled":true,"server_name":"a.example"}}""")),
             activeProxyTag = "p1",
@@ -61,13 +72,16 @@ class DesktopEngineIntegrationTest {
             options = NetworkOptions(),
             routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"))
         )
-        core.check(config)
-        val failure = runCatching { core.check("""{"outbounds": [{"type": "no-such-type"}]}""") }.exceptionOrNull()
-        assertNotNull("an invalid config must be rejected", failure)
+        ServiceClient.connect(startService()).use { client ->
+            client.check(config)
+            val failure = runCatching { client.check("""{"outbounds": [{"type": "no-such-type"}]}""") }.exceptionOrNull()
+            assertNotNull("an invalid config must be rejected", failure)
+        }
     }
 
     @Test
-    fun embeddedCoreStartsControlsAndRestartsInProcess() {
+    fun serviceRunsTheCoreAndStopsItWhenTheAppDisconnects() {
+        val socket = startService()
         val socksPort = freeLoopbackPort()
         val user = randomToken()
         val pass = randomToken()
@@ -85,29 +99,36 @@ class DesktopEngineIntegrationTest {
             }
         """.trimIndent()
 
-        repeat(2) {
-            core.start(config, workDir)
-            try {
-                assertNotNull(runCatching { core.start(config, workDir) }.exceptionOrNull())
-                assertTrue(core.select("proxy", "p2"))
-                assertFalse(core.select("proxy", "missing"))
-                assertNotNull(core.delay("p1", ProbeUrls.VPN, 10_000))
+        val service = DesktopService(socket, bundled = File(binDir, "frkn-service"), appDir = null, expectedVersion = null, log = SilentLog)
+        val client = service.connect()
+        assertEquals(File(workDir, "svc").absoluteFile, service.hello?.workDir)
+        assertTrue(service.hello?.core.orEmpty().isNotEmpty())
 
-                val snapshot: HealthSnapshot = runBlocking {
-                    withTimeout(30.seconds) {
-                        SocksHealthProbe(ProbeUrls.VPN, ProbeUrls.BYEDPI)
-                            .observe(ProbeParams(FakeEngine(socksPort, user, pass), byeDpiPort = null, vpnActive = true) { false })
-                            .first()
-                    }
+        repeat(2) {
+            client.start(config)
+            assertNotNull(runCatching { client.start(config) }.exceptionOrNull())
+            assertTrue(client.select("proxy", "p2"))
+            assertFalse(client.select("proxy", "missing"))
+            assertNotNull(client.delay("p1", ProbeUrls.VPN, 10_000))
+            val snapshot: HealthSnapshot = runBlocking {
+                withTimeout(30.seconds) {
+                    SocksHealthProbe(ProbeUrls.VPN, ProbeUrls.BYEDPI)
+                        .observe(ProbeParams(FakeEngine(socksPort, user, pass), byeDpiPort = null, vpnActive = true) { false })
+                        .first()
                 }
-                assertTrue("probe through authenticated SOCKS failed", snapshot.vpnUp)
-                val traffic = checkNotNull(core.traffic())
-                assertTrue("traffic must be counted", traffic.down > 0)
-            } finally {
-                core.stop()
             }
-            assertNull(core.traffic())
-            assertTrue(File(workDir, "box.log").isFile)
+            assertTrue("probe through authenticated SOCKS failed", snapshot.vpnUp)
+            assertTrue("traffic must be counted", checkNotNull(client.traffic()).down > 0)
+            client.stop()
+            assertNull(client.traffic())
+        }
+
+        client.start(config)
+        client.close()
+        ServiceClient.connect(socket).use { other ->
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            while (other.traffic() != null && System.nanoTime() < deadline) Thread.sleep(100)
+            assertNull("the tunnel must stop once the app that started it disconnects", other.traffic())
         }
     }
 

@@ -128,4 +128,9 @@
     <string name="connection_type_direct">Direct</string>
     <string name="connection_type_byedpi">ByeDPI</string>
     <string name="connection_type_vpn">VPN</string>
+    <string name="exit_confirm_title">Disconnect and exit?</string>
+    <string name="exit_confirm_text">The VPN is connected. Closing FRKN will disconnect it.</string>
+    <string name="exit_confirm_exit">Exit</string>
+    <string name="exit_confirm_tray">Minimize to tray</string>
+    <string name="tray_open">Open FRKN</string>
 </resources>

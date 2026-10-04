@@ -19,9 +19,10 @@ Get the latest APKs and the Windows installer from
 
 - **Android** — `FRKN-<version>-arm64-v8a.apk` fits almost every modern phone;
   `universal` works everywhere. Android 10 or newer.
-- **Windows** — `FRKN-<version>.msi`, Windows 10/11 x64. The app needs administrator
-  rights to create the tunnel and asks for them on launch. To update, close FRKN and
+- **Windows** — `FRKN-<version>.msi`, Windows 10/11 x64. To update, close FRKN and
   install the newer MSI over the old one; settings and servers are kept.
+  The tunnel runs in the FRKN background service, which the installer sets up, so the app
+  itself never asks for administrator rights.
 
 ## Features
 
@@ -48,8 +49,8 @@ FRKN combines two engines behind a single tunnel interface:
   upstream server, *ByeDPI* apps to the local bypass proxy, *Direct* apps straight out.
   FRKN uses [amnezia-box](https://github.com/amnezia-vpn/amnezia-box), the Amnezia fork
   of [sing-box](https://github.com/SagerNet/sing-box) that adds AmneziaWG. The same core
-  is embedded on both platforms: as a Go Mobile library on Android and as
-  `frkn-core.dll` on Windows.
+  runs on both platforms: as a Go Mobile library inside the app on Android and as the
+  `frkn-service` background service on Windows.
 - **[ByeDPI](https://github.com/hufrea/byedpi)** runs as a local proxy that
   desynchronizes packets to slip past Deep Packet Inspection.
 
@@ -78,17 +79,17 @@ Android's VPN APIs are unreliable on emulators.
 
 ### Windows
 
-The core DLL is cross-compiled with MinGW (`gcc-mingw-w64-x86-64` on Debian/Ubuntu, or
-any C compiler for Windows set in `WINDOWS_CC`):
+The tunnel runs in a small background service, `frkn-service.exe`, built from the same core
+(no C toolchain needed):
 
 ```bash
-CORE_TARGETS=windows bash scripts/build-libbox.sh   # → desktop/libs/windows/frkn-core.dll
+CORE_TARGETS=windows bash scripts/build-libbox.sh   # → desktop/libs/windows/frkn-service.exe
 ```
 
 The installer itself must be built on Windows with JDK 21:
 
 ```bash
-./gradlew -Pfrkn.desktopOnly :desktop:packageReleaseMsi
+./gradlew -Pfrkn.desktopOnly :desktop:packageServiceMsi
 ```
 
 `-Pfrkn.desktopOnly` skips the Android modules, so no Android SDK is needed there.

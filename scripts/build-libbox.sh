@@ -15,7 +15,6 @@
 #   LIBBOX_WORK_DIR scratch dir for the sing-box checkout (default <repo>/.libbox-build)
 #   FORCE_REBUILD=1 build even if app/libs/libbox.aar already exists
 #   CORE_TARGETS    any of: android windows linux     (default "android windows")
-#   WINDOWS_CC      C cross-compiler for frkn-core.dll   (default x86_64-w64-mingw32-gcc)
 #
 # On a sing-box bump the only thing that can break is the stub below: if upstream
 # changes the ShellSession interface / OpenNative*Session signatures, the build (or
@@ -32,10 +31,10 @@ WORK_DIR="${LIBBOX_WORK_DIR:-${REPO_ROOT}/.libbox-build}"
 SRC="${WORK_DIR}/sing-box"
 OUT_AAR="${REPO_ROOT}/app/libs/libbox.aar"
 OUT_WINDOWS_DIR="${REPO_ROOT}/desktop/libs/windows"
-OUT_WINDOWS_DLL="${OUT_WINDOWS_DIR}/frkn-core.dll"
-OUT_LINUX_SO="${REPO_ROOT}/desktop/libs/linux/libfrkn-core.so"
-WINDOWS_CC="${WINDOWS_CC:-x86_64-w64-mingw32-gcc}"
-DESKTOP_CORE_SRC="${REPO_ROOT}/desktop/core"
+OUT_WINDOWS_SERVICE="${OUT_WINDOWS_DIR}/frkn-service.exe"
+OUT_LINUX_SERVICE="${REPO_ROOT}/desktop/libs/linux/frkn-service"
+DESKTOP_SERVICE_SRC="${REPO_ROOT}/desktop/service"
+APP_VERSION="$(sed -n 's/^frkn\.versionName=//p' "${REPO_ROOT}/gradle.properties" | head -n1)"
 CORE_TARGETS="${CORE_TARGETS:-android windows}"
 
 # FULL upstream Android libbox feature set (cmd/internal/build_libbox sharedTags)
@@ -60,8 +59,8 @@ BUILD_ANDROID=0
 BUILD_WINDOWS=0
 BUILD_LINUX=0
 if wants android && needs_build "$OUT_AAR"; then BUILD_ANDROID=1; fi
-if wants windows && needs_build "$OUT_WINDOWS_DLL"; then BUILD_WINDOWS=1; fi
-if wants linux && needs_build "$OUT_LINUX_SO"; then BUILD_LINUX=1; fi
+if wants windows && needs_build "$OUT_WINDOWS_SERVICE"; then BUILD_WINDOWS=1; fi
+if wants linux && needs_build "$OUT_LINUX_SERVICE"; then BUILD_LINUX=1; fi
 if [ "$BUILD_ANDROID$BUILD_WINDOWS$BUILD_LINUX" = "000" ]; then
   say "Core already built for: $CORE_TARGETS — skipping (FORCE_REBUILD=1 to override)."
   exit 0
@@ -72,9 +71,6 @@ if [ "$BUILD_ANDROID" = "1" ]; then
   command -v gomobile  >/dev/null || die "gomobile not in PATH (go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.13)"
   command -v gobind    >/dev/null || die "gobind not in PATH (go install github.com/sagernet/gomobile/cmd/gobind@v0.1.13)"
   [ -n "${ANDROID_NDK_HOME:-}" ] && [ -d "$ANDROID_NDK_HOME" ] || die "ANDROID_NDK_HOME unset or missing"
-fi
-if [ "$BUILD_WINDOWS" = "1" ]; then
-  command -v "${WINDOWS_CC%% *}" >/dev/null || die "$WINDOWS_CC not in PATH (apt install gcc-mingw-w64-x86-64, or set WINDOWS_CC)"
 fi
 
 # ── 1. Fetch sing-box at the pinned tag. ────────────────────────────────────────
@@ -201,23 +197,22 @@ if [ "$BUILD_ANDROID" = "1" ]; then
   ls -la "$OUT_AAR"
 fi
 
-build_desktop_core() {
-  local goos="$1" cc="$2" out="$3"
-  say "Building the desktop core: $(basename "$out") ($goos/amd64), tags: $DESKTOP_TAGS"
+build_desktop_service() {
+  local goos="$1" out="$2"
+  say "Building the desktop service: $(basename "$out") ($goos/amd64, version $APP_VERSION), tags: $DESKTOP_TAGS"
   mkdir -p "$(dirname "$out")"
-  rm -rf cmd/frkn-core
-  cp -r "$DESKTOP_CORE_SRC" cmd/frkn-core
-  CGO_ENABLED=1 GOOS="$goos" GOARCH=amd64 CC="$cc" go build -buildmode=c-shared -trimpath -buildvcs=false \
-    -ldflags "$LDFLAGS" -tags "$DESKTOP_TAGS" -o "$out" ./cmd/frkn-core
-  rm -f "${out%.*}.h"
+  rm -rf cmd/frkn-service
+  cp -r "$DESKTOP_SERVICE_SRC" cmd/frkn-service
+  CGO_ENABLED=0 GOOS="$goos" GOARCH=amd64 go build -trimpath -buildvcs=false \
+    -ldflags "$LDFLAGS -X main.version=$APP_VERSION" -tags "$DESKTOP_TAGS" -o "$out" ./cmd/frkn-service
   cp LICENSE "$(dirname "$out")/sing-box-LICENSE.txt"
   ls -la "$out"
 }
 
 if [ "$BUILD_WINDOWS" = "1" ]; then
-  build_desktop_core windows "$WINDOWS_CC" "$OUT_WINDOWS_DLL"
+  build_desktop_service windows "$OUT_WINDOWS_SERVICE"
 fi
 if [ "$BUILD_LINUX" = "1" ]; then
-  build_desktop_core linux "${LINUX_CC:-gcc}" "$OUT_LINUX_SO"
+  build_desktop_service linux "$OUT_LINUX_SERVICE"
 fi
 say "DONE."

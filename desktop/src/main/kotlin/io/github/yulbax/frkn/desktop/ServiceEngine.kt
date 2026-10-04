@@ -15,9 +15,8 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-class EmbeddedSingBoxEngine(
-    private val core: SingBoxCore,
-    private val workDir: File,
+class ServiceEngine(
+    private val service: DesktopService,
     private val directProcesses: List<String>,
     private val delayProbeUrl: String,
     private val listener: EngineListener,
@@ -28,15 +27,13 @@ class EmbeddedSingBoxEngine(
     override val probeUsername: String = randomToken()
     override val probePassword: String = randomToken()
 
-    private val boxLog = File(workDir, "box.log")
-
-    @Volatile private var running = false
+    @Volatile private var client: ServiceClient? = null
     @Volatile private var proxyTags: List<String> = emptyList()
     private var traffic: ScheduledExecutorService? = null
 
     @Synchronized
     override fun start(config: EngineConfig) {
-        check(!running) { "sing-box is already running" }
+        check(client == null) { "sing-box is already running" }
         launch(config)
     }
 
@@ -46,20 +43,22 @@ class EmbeddedSingBoxEngine(
         launch(config)
     }
 
-    override fun selectProxy(tag: String): Boolean = core.select(ConfigBuilder.PROXY_GROUP_TAG, tag)
+    override fun selectProxy(tag: String): Boolean =
+        client?.runCatching { select(ConfigBuilder.PROXY_GROUP_TAG, tag) }?.getOrNull() ?: false
 
     override fun testProxies() {
         val tags = proxyTags
         thread(isDaemon = true, name = "sing-box-delay") {
             val delays = tags.associateWith { tag ->
-                core.delay(tag, delayProbeUrl, DELAY_TIMEOUT_MS)?.let(ProxyDelay::Measured) ?: ProxyDelay.Failed
+                client?.runCatching { delay(tag, delayProbeUrl, DELAY_TIMEOUT_MS) }?.getOrNull()
+                    ?.let(ProxyDelay::Measured) ?: ProxyDelay.Failed
             }
             listener.onProxyDelays(delays)
         }
     }
 
     override fun hasFingerprintError(): Boolean = runCatching {
-        boxLog.takeIf { it.exists() }?.useLines { lines ->
+        boxLog()?.takeIf { it.exists() }?.useLines { lines ->
             lines.any { it.contains("unsupported curve", ignoreCase = true) }
         } ?: false
     }.getOrDefault(false)
@@ -70,21 +69,22 @@ class EmbeddedSingBoxEngine(
     }
 
     private fun launch(config: EngineConfig) {
-        workDir.mkdirs()
-        runCatching { boxLog.writeText("") }
         proxyTags = config.proxies.map { it.tag }
-        core.start(buildConfig(config), workDir)
-        running = true
-        log.i(TAG, "sing-box started")
-        traffic = sampleTraffic()
+        val connected = service.connect()
+        connected.start(buildConfig(config))
+        client = connected
+        log.i(TAG, "sing-box started by the FRKN service ${service.hello?.version.orEmpty()}")
+        traffic = sampleTraffic(connected)
     }
 
-    private fun sampleTraffic(): ScheduledExecutorService {
-        var last: SingBoxCore.Traffic? = null
+    private fun boxLog(): File? = service.hello?.workDir?.let { File(it, "box.log") }
+
+    private fun sampleTraffic(connected: ServiceClient): ScheduledExecutorService {
+        var last: ServiceClient.Traffic? = null
         return Executors.newSingleThreadScheduledExecutor { Thread(it, "sing-box-traffic").apply { isDaemon = true } }
             .apply {
                 scheduleAtFixedRate({
-                    val now = core.traffic() ?: return@scheduleAtFixedRate
+                    val now = runCatching { connected.traffic() }.getOrNull() ?: return@scheduleAtFixedRate
                     last?.let { listener.onThroughput(now.up - it.up, now.down - it.down) }
                     last = now
                 }, 0, 1, TimeUnit.SECONDS)
@@ -92,11 +92,11 @@ class EmbeddedSingBoxEngine(
     }
 
     private fun terminate() {
-        if (!running) return
-        running = false
+        val stopping = client ?: return
+        client = null
         traffic?.shutdownNow()
         traffic = null
-        runCatching { core.stop() }.onFailure { log.w(TAG, "sing-box stop failed", it) }
+        if (stopping.isOpen) runCatching { stopping.stop() }.onFailure { log.w(TAG, "sing-box stop failed", it) }
     }
 
     private fun buildConfig(config: EngineConfig): String = ConfigBuilder.build(
@@ -114,7 +114,7 @@ class EmbeddedSingBoxEngine(
     )
 
     private companion object {
-        const val TAG = "SingBoxCore"
+        const val TAG = "ServiceEngine"
         const val DELAY_TIMEOUT_MS = 5_000
     }
 }

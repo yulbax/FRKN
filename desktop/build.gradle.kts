@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.jna)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.jetbrains.compose.material.icons.extended)
     testImplementation(libs.junit)
 }
@@ -44,7 +45,7 @@ val prepareWindowsBinaries = tasks.register("prepareWindowsBinaries") {
         "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         mapOf("ciadpi.exe" to "ciadpi.exe")
     )
-    val coreFiles = listOf("frkn-core.dll", "sing-box-LICENSE.txt").map { windowsCoreDir.file(it).asFile }
+    val coreFiles = listOf("frkn-service.exe", "sing-box-LICENSE.txt").map { windowsCoreDir.file(it).asFile }
     val outputDir = bundledResourcesDir.map { it.dir("windows") }
     inputs.property("byeDpiArchive", byeDpiArchive.toString())
     inputs.files(coreFiles).withPropertyName("core").optional()
@@ -107,4 +108,36 @@ compose.desktop {
 
 if (System.getProperty("os.name").startsWith("Windows")) {
     tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(prepareWindowsBinaries) }
+
+    tasks.register<Exec>("packageServiceMsi") {
+        group = "distribution"
+        description = "Builds the MSI with a WiX template that installs and removes the FRKN background service."
+        dependsOn("createReleaseDistributable", rootProject.tasks.named("unzipWix"))
+        val appImage = layout.buildDirectory.dir("compose/binaries/main-release/app/FRKN")
+        val output = layout.buildDirectory.dir("compose/binaries/main-release/msi")
+        val wixDir = rootProject.layout.buildDirectory.dir("wix311")
+        inputs.dir(appImage)
+        inputs.dir("packaging/windows")
+        outputs.dir(output)
+        doFirst {
+            output.get().asFile.apply { deleteRecursively(); mkdirs() }
+            environment("PATH", wixDir.get().asFile.absolutePath + File.pathSeparator + System.getenv("PATH"))
+        }
+        executable = File(System.getProperty("java.home"), "bin/jpackage.exe").absolutePath
+        args(
+            "--type", "msi",
+            "--app-image", appImage.get().asFile.absolutePath,
+            "--dest", output.get().asFile.absolutePath,
+            "--resource-dir", project.file("packaging/windows").absolutePath,
+            "--name", "FRKN",
+            "--app-version", appVersion,
+            "--vendor", "yulbax",
+            "--description", "FRKN VPN with per-app routing and ByeDPI",
+            "--install-dir", "FRKN",
+            "--win-menu",
+            "--win-shortcut",
+            "--win-dir-chooser",
+            "--win-upgrade-uuid", "6f0b3a2e-6c1b-4a8e-9c7e-3f4d5a1b2c90"
+        )
+    }
 }

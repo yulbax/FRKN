@@ -1,7 +1,6 @@
 package io.github.yulbax.frkn.desktop
 
 import io.github.yulbax.frkn.data.profile.ProfileRepository
-import io.github.yulbax.frkn.util.AppLog
 import io.github.yulbax.frkn.util.DiagnosticsReport
 import io.github.yulbax.frkn.util.DiagnosticsSource
 import io.github.yulbax.frkn.util.FileAppLog
@@ -9,10 +8,7 @@ import io.github.yulbax.frkn.util.VersionInfo
 import io.github.yulbax.frkn.util.VpnLauncher
 import io.github.yulbax.frkn.vpn.VpnController
 import io.github.yulbax.frkn.vpn.VpnHost
-import io.github.yulbax.frkn.vpn.VpnState
-import io.github.yulbax.frkn.vpn.VpnStateRepository
 import java.io.File
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,29 +22,15 @@ object DesktopHost : VpnHost {
     override fun onSessionStopped(stopToken: Int?, stopHost: Boolean) = Unit
 }
 
-class DesktopVpnLauncher(
-    private val controller: VpnController,
-    private val stateRepository: VpnStateRepository,
-    private val log: AppLog
-) : VpnLauncher {
+class DesktopVpnLauncher(private val controller: VpnController) : VpnLauncher {
     override fun start() {
-        if (DesktopPaths.isWindows && !WindowsElevation.isElevated()) {
-            log.w(TAG, "VPN start refused: process is not elevated")
-            stateRepository.update(VpnState.Error(ELEVATION_REQUIRED))
-            return
-        }
         controller.start(token = null, systemInitiated = false)
-    }
-
-    private companion object {
-        const val TAG = "DesktopVpnLauncher"
-        const val ELEVATION_REQUIRED = "Administrator rights are required to create the VPN adapter. Restart FRKN as administrator."
     }
 }
 
 class DesktopDiagnostics(
     private val log: FileAppLog,
-    private val workDir: File,
+    private val service: DesktopService,
     private val versionInfo: VersionInfo,
     private val profiles: ProfileRepository
 ) : DiagnosticsSource {
@@ -58,45 +40,20 @@ class DesktopDiagnostics(
                 "app" to "${versionInfo.appVersion ?: "unknown"} (core ${versionInfo.coreVersion() ?: "unknown"}, byedpi ${versionInfo.byeDpiVersion})",
                 "os" to "${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})",
                 "java" to System.getProperty("java.version"),
-                "elevated" to WindowsElevation.isElevated().toString()
+                "service" to (service.peek()?.version ?: "not running")
             ),
             appLog = log.dump(),
-            boxLog = File(workDir, "box.log"),
+            boxLog = File(service.peek()?.workDir ?: DesktopPaths.serviceSocket.parentFile, "box.log"),
             profiles = profiles.profileDiagnostics()
         )
     }
 }
 
-class DesktopVersionInfo(private val core: SingBoxCore) : VersionInfo {
+class DesktopVersionInfo(private val service: DesktopService) : VersionInfo {
     override val appVersion: String? = System.getProperty("frkn.version")
     override val byeDpiVersion: String = System.getProperty("frkn.byedpi.version") ?: "unknown"
 
     override suspend fun coreVersion(): String? = withContext(Dispatchers.IO) {
-        runCatching { core.version.ifBlank { null } }.getOrNull()
-    }
-}
-
-object WindowsElevation {
-    private const val HIGH_INTEGRITY_SID = "S-1-16-12288"
-
-    fun isElevated(): Boolean {
-        if (!DesktopPaths.isWindows) return true
-        return runCatching {
-            val process = ProcessBuilder("whoami", "/groups").redirectErrorStream(true).start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            process.waitFor(5, TimeUnit.SECONDS)
-            output.contains(HIGH_INTEGRITY_SID)
-        }.getOrDefault(false)
-    }
-
-    fun relaunchElevated(): Boolean {
-        val executable = ProcessHandle.current().info().command().orElse(null) ?: return false
-        if (!File(executable).name.equals("FRKN.exe", ignoreCase = true)) return false
-        return runCatching {
-            ProcessBuilder(
-                "powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command",
-                "Start-Process -FilePath '${executable.replace("'", "''")}' -Verb RunAs"
-            ).start().waitFor() == 0
-        }.getOrDefault(false)
+        service.peek()?.core?.ifBlank { null }
     }
 }

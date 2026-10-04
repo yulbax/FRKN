@@ -127,4 +127,9 @@
     <string name="subscription">Подписка</string>
     <string name="fetch_subscription_failed">Не удалось получить подписку: %1$s</string>
     <string name="no_servers_in_subscription">В подписке нет серверов</string>
+    <string name="exit_confirm_title">Отключиться и выйти?</string>
+    <string name="exit_confirm_text">VPN подключён. Если закрыть FRKN, подключение разорвётся.</string>
+    <string name="exit_confirm_exit">Выйти</string>
+    <string name="exit_confirm_tray">Свернуть в трей</string>
+    <string name="tray_open">Открыть FRKN</string>
 </resources>

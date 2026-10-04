@@ -124,4 +124,9 @@
     <string name="subscription">订阅</string>
     <string name="fetch_subscription_failed">获取订阅失败：%1$s</string>
     <string name="no_servers_in_subscription">订阅中未找到服务器</string>
+    <string name="exit_confirm_title">断开连接并退出？</string>
+    <string name="exit_confirm_text">VPN 已连接。关闭 FRKN 将断开连接。</string>
+    <string name="exit_confirm_exit">退出</string>
+    <string name="exit_confirm_tray">最小化到托盘</string>
+    <string name="tray_open">打开 FRKN</string>
 </resources>

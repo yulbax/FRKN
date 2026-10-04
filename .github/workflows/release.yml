@@ -66,7 +66,7 @@ jobs:
           path: |
             app/libs/libbox.aar
             desktop/libs/windows
-          key: libbox-${{ env.SING_BOX_TAG }}-${{ env.LIBBOX_CACHE_REV }}-${{ hashFiles('desktop/core/**', 'scripts/build-libbox.sh') }}
+          key: libbox-${{ env.SING_BOX_TAG }}-${{ env.LIBBOX_CACHE_REV }}-${{ hashFiles('desktop/service/**', 'scripts/build-libbox.sh', 'gradle.properties') }}
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-go@v5
         with:
@@ -80,7 +80,6 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           set -e
-          sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64-x86-64
           # android-36 (integer-named) is for gomobile, which can't parse the preview
           # "android-37.0" platform name. --channel=3 (canary) is needed for android-37.0.
           sdkmanager --channel=3 "platforms;android-${ANDROID_COMPILE_SDK}" "platforms;android-36" "ndk;${NDK_VERSION}"
@@ -185,7 +184,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Desktop tests and MSI
         shell: bash
-        run: ./gradlew -Pfrkn.desktopOnly :shared:desktopTest :ui:desktopTest :desktop:packageReleaseMsi --no-daemon
+        run: ./gradlew -Pfrkn.desktopOnly :shared:desktopTest :ui:desktopTest :desktop:packageServiceMsi --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: msi

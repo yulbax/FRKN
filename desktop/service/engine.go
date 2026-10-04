@@ -1,23 +1,15 @@
 package main
 
-/*
-#include <stdint.h>
-#include <stdlib.h>
-*/
-import "C"
-
 import (
 	"context"
 	"errors"
-	"os"
 	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/urltest"
-	C2 "github.com/sagernet/sing-box/constant"
+	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/experimental/clashapi"
 	"github.com/sagernet/sing-box/experimental/deprecated"
 	"github.com/sagernet/sing-box/include"
@@ -35,10 +27,10 @@ type instance struct {
 	cancel context.CancelFunc
 }
 
-var (
+type engine struct {
 	mutex   sync.Mutex
 	current *instance
-)
+}
 
 func baseContext() context.Context {
 	return include.Context(service.ContextWith(context.Background(), deprecated.NewStderrManager(log.StdLogger())))
@@ -86,7 +78,7 @@ func (i *instance) close() error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(C2.FatalStopTimeout):
+	case <-time.After(C.FatalStopTimeout):
 		return errors.New("sing-box did not close in time")
 	}
 }
@@ -104,123 +96,90 @@ func removeStaleAdapters(options option.Options) error {
 	return nil
 }
 
-func result(err error) *C.char {
-	if err == nil {
-		return nil
-	}
-	return C.CString(err.Error())
-}
-
-//export frkn_free
-func frkn_free(value *C.char) {
-	C.free(unsafe.Pointer(value))
-}
-
-//export frkn_version
-func frkn_version() *C.char {
-	return C.CString(C2.Version)
-}
-
-//export frkn_check
-func frkn_check(config *C.char) *C.char {
-	checked, err := create(C.GoString(config), nil)
+func check(config string) error {
+	checked, err := create(config, nil)
 	if err != nil {
-		return result(err)
+		return err
 	}
 	checked.cancel()
-	return result(checked.box.Close())
+	return checked.box.Close()
 }
 
-//export frkn_start
-func frkn_start(config *C.char, workDir *C.char) *C.char {
-	mutex.Lock()
-	defer mutex.Unlock()
-	if current != nil {
-		return result(errors.New("sing-box is already running"))
+func (e *engine) start(config string) error {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	if e.current != nil {
+		return errors.New("sing-box is already running")
 	}
-	if err := os.Chdir(C.GoString(workDir)); err != nil {
-		return result(err)
-	}
-	started, err := create(C.GoString(config), removeStaleAdapters)
+	started, err := create(config, removeStaleAdapters)
 	if err != nil {
-		return result(err)
+		return err
 	}
 	if err = started.box.Start(); err != nil {
 		_ = started.close()
-		return result(err)
+		return err
 	}
-	current = started
+	e.current = started
 	return nil
 }
 
-//export frkn_stop
-func frkn_stop() *C.char {
-	mutex.Lock()
-	defer mutex.Unlock()
-	if current == nil {
+func (e *engine) stop() error {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	if e.current == nil {
 		return nil
 	}
-	stopping := current
-	current = nil
-	return result(stopping.close())
+	stopping := e.current
+	e.current = nil
+	return stopping.close()
 }
 
-func running() *instance {
-	mutex.Lock()
-	defer mutex.Unlock()
-	return current
+func (e *engine) running() *instance {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	return e.current
 }
 
-//export frkn_select
-func frkn_select(groupTag *C.char, outboundTag *C.char) C.int32_t {
-	active := running()
+func (e *engine) selectOutbound(groupTag string, outboundTag string) bool {
+	active := e.running()
 	if active == nil {
-		return 0
+		return false
 	}
-	outbound, loaded := active.box.Outbound().Outbound(C.GoString(groupTag))
+	outbound, loaded := active.box.Outbound().Outbound(groupTag)
 	if !loaded {
-		return 0
+		return false
 	}
 	selector, isSelector := outbound.(*group.Selector)
-	if !isSelector || !selector.SelectOutbound(C.GoString(outboundTag)) {
-		return 0
-	}
-	return 1
+	return isSelector && selector.SelectOutbound(outboundTag)
 }
 
-//export frkn_delay
-func frkn_delay(outboundTag *C.char, link *C.char, timeoutMs C.int32_t) C.int32_t {
-	active := running()
+func (e *engine) delay(outboundTag string, link string, timeout time.Duration) int {
+	active := e.running()
 	if active == nil {
 		return -1
 	}
-	outbound, loaded := active.box.Outbound().Outbound(C.GoString(outboundTag))
+	outbound, loaded := active.box.Outbound().Outbound(outboundTag)
 	if !loaded {
 		return -1
 	}
-	ctx, cancel := context.WithTimeout(active.ctx, time.Duration(timeoutMs)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(active.ctx, timeout)
 	defer cancel()
-	delay, err := urltest.URLTest(ctx, C.GoString(link), outbound)
+	delay, err := urltest.URLTest(ctx, link, outbound)
 	if err != nil || delay == 0 {
 		return -1
 	}
-	return C.int32_t(delay)
+	return int(delay)
 }
 
-//export frkn_traffic
-func frkn_traffic(up *C.int64_t, down *C.int64_t) C.int32_t {
-	active := running()
+func (e *engine) traffic() (up int64, down int64, ok bool) {
+	active := e.running()
 	if active == nil {
-		return 0
+		return 0, 0, false
 	}
 	server, isClash := service.FromContext[adapter.ClashServer](active.ctx).(*clashapi.Server)
 	if !isClash {
-		return 0
+		return 0, 0, false
 	}
-	totalUp, totalDown := server.TrafficManager().Total()
-	*up = C.int64_t(totalUp)
-	*down = C.int64_t(totalDown)
-	return 1
+	up, down = server.TrafficManager().Total()
+	return up, down, true
 }
-
-func main() {}

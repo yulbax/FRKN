@@ -125,4 +125,9 @@
     <string name="subscription">اشتراک</string>
     <string name="fetch_subscription_failed">دریافت اشتراک ناموفق بود: %1$s</string>
     <string name="no_servers_in_subscription">سروری در اشتراک یافت نشد</string>
+    <string name="exit_confirm_title">قطع اتصال و خروج؟</string>
+    <string name="exit_confirm_text">VPN متصل است. با بستن FRKN اتصال قطع می‌شود.</string>
+    <string name="exit_confirm_exit">خروج</string>
+    <string name="exit_confirm_tray">کوچک‌سازی به سینی سیستم</string>
+    <string name="tray_open">باز کردن FRKN</string>
 </resources>
