@@ -1,10 +1,11 @@
 package io.github.yulbax.frkn.vpn.singbox
 
+import io.github.yulbax.frkn.vpn.core.EnginePlacement
 import io.github.yulbax.frkn.vpn.core.EngineProxy
+import io.github.yulbax.frkn.vpn.core.EngineRequirement
 import io.github.yulbax.frkn.vpn.core.NetworkOptions
 import io.github.yulbax.frkn.vpn.core.TlsFingerprint
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -61,13 +62,19 @@ object ConfigBuilder {
             val outbound = JsonObject((Json.parseToJsonElement(proxy.outboundDescriptor) as JsonObject).toMutableMap().apply {
                 put("tag", JsonPrimitive(proxy.tag))
             })
-            proxy to applyPreferredFingerprint(outbound, options.preferredFingerprint)
+            val decorated = if (EngineRequirement.TLS_FINGERPRINT in proxy.requirements) {
+                applyPreferredFingerprint(outbound, options.preferredFingerprint)
+            } else {
+                outbound
+            }
+            proxy to decorated
         }
-        val (proxyEndpoints, proxyOutbounds) = proxyObjects.partition { it.first.tunnelEndpoint }
-        val defaultTag = proxies.firstOrNull { it.tag == activeProxyTag }?.tag ?: proxies.first().tag
-        val activeEndpoint = proxyEndpoints.firstOrNull { it.first.tag == defaultTag }?.second
-        val tunnelIsIpv4Only = activeEndpoint?.let { !it.hasIpv6Address() } == true
-        val dnsStrategy = if (tunnelIsIpv4Only) IPV4_ONLY else options.ipv6Mode.dnsStrategy
+        val (proxyEndpoints, proxyOutbounds) = proxyObjects.partition { it.first.placement == EnginePlacement.ENDPOINT }
+        val active = proxies.firstOrNull { it.tag == activeProxyTag } ?: proxies.first()
+        val defaultTag = active.tag
+        val sessionRequirements = active.sessionRequirements
+        val dnsStrategy =
+            if (EngineRequirement.IPV4_ONLY in sessionRequirements) IPV4_ONLY else options.ipv6Mode.dnsStrategy
 
         val config = buildJsonObject {
             putJsonObject("log") {
@@ -178,7 +185,7 @@ object ConfigBuilder {
                         put("protocol", "dns")
                         put("action", "hijack-dns")
                     })
-                    if (activeEndpoint != null) {
+                    if (EngineRequirement.RESOLVE_BEFORE_DIAL in sessionRequirements) {
                         add(buildJsonObject {
                             put("action", "resolve")
                             put("server", REMOTE_DNS_TAG)
@@ -224,7 +231,7 @@ object ConfigBuilder {
                     }
                     if (routing is AppRouting.AndroidPackages) add(buildJsonObject { put("action", "reject") })
                 }
-                put("final", if (routing is AppRouting.AndroidPackages) PROXY_GROUP_TAG else "direct")
+                put("final", if (routing is AppRouting.AndroidPackages || options.routeAllTraffic) PROXY_GROUP_TAG else "direct")
                 put("auto_detect_interface", true)
                 put("default_domain_resolver", "local")
             }
@@ -240,9 +247,6 @@ object ConfigBuilder {
         }
         return json.encodeToString(JsonObject.serializer(), config)
     }
-
-    private fun JsonObject.hasIpv6Address(): Boolean =
-        (this["address"] as? JsonArray)?.any { (it as? JsonPrimitive)?.content?.contains(':') == true } == true
 
     private fun applyPreferredFingerprint(outbound: JsonObject, preferred: TlsFingerprint?): JsonObject {
         if (preferred == null) return outbound

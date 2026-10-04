@@ -1,9 +1,9 @@
 package io.github.yulbax.frkn.data.profile
 
 import io.github.yulbax.frkn.data.AppDatabase
+import io.github.yulbax.frkn.proxy.LinkParser
+import io.github.yulbax.frkn.proxy.ParsedProfile
 import io.github.yulbax.frkn.util.AppLog
-import io.github.yulbax.frkn.util.LinkParser
-import io.github.yulbax.frkn.util.ParsedProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 

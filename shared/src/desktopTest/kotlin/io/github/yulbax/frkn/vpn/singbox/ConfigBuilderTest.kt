@@ -1,6 +1,7 @@
 package io.github.yulbax.frkn.vpn.singbox
 
-import io.github.yulbax.frkn.vpn.core.EngineProxy
+import io.github.yulbax.frkn.proxy.LinkParser
+import io.github.yulbax.frkn.proxy.ProxyProtocol
 import io.github.yulbax.frkn.vpn.core.Ipv6Mode
 import io.github.yulbax.frkn.vpn.core.NetworkOptions
 import io.github.yulbax.frkn.vpn.core.TlsFingerprint
@@ -18,8 +19,8 @@ import org.junit.Test
 
 class ConfigBuilderTest {
     private val proxies = listOf(
-        EngineProxy("p1", """{"type":"vless","server":"a.example","server_port":443,"uuid":"u","tls":{"enabled":true,"server_name":"a.example"}}"""),
-        EngineProxy("p2", """{"type":"trojan","server":"b.example","server_port":443,"password":"x","tls":{"enabled":true,"utls":{"enabled":true,"fingerprint":"firefox"}}}""")
+        ProxyProtocol.VLESS.engineProxy("p1", """{"type":"vless","server":"a.example","server_port":443,"uuid":"u","tls":{"enabled":true,"server_name":"a.example"}}"""),
+        ProxyProtocol.TROJAN.engineProxy("p2", """{"type":"trojan","server":"b.example","server_port":443,"password":"x","tls":{"enabled":true,"utls":{"enabled":true,"fingerprint":"firefox"}}}""")
     )
 
     @Test
@@ -69,11 +70,54 @@ class ConfigBuilderTest {
     }
 
     @Test
-    fun amneziaWgProfileIsEmittedAsEndpoint() {
-        val awg = requireNotNull(io.github.yulbax.frkn.util.LinkParser.parse(AWG_CONFIG))
+    fun desktopRouteAllTrafficSendsUnassignedProcessesThroughTheProxy() {
+        fun finalOf(routeAll: Boolean): String {
+            val config = Json.parseToJsonElement(
+                ConfigBuilder.build(
+                    proxies, "p1", emptyList(), emptyList(), emptyList(), 1081, 2080, "user", "pass",
+                    NetworkOptions(routeAllTraffic = routeAll),
+                    routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"), ControlApi(9090, "secret"))
+                )
+            ).jsonObject
+            val route = config.getValue("route").jsonObject
+            assertEquals(listOf("ciadpi.exe"), route.getValue("rules").jsonArray.map { it.jsonObject }.processRule("direct"))
+            return route.getValue("final").jsonPrimitive.content
+        }
+
+        assertEquals(ConfigBuilder.PROXY_GROUP_TAG, finalOf(routeAll = true))
+        assertEquals("direct", finalOf(routeAll = false))
+    }
+
+    @Test
+    fun preferredFingerprintSkipsQuicBasedHysteria2() {
+        val hysteria = requireNotNull(LinkParser.parse("hysteria2://secret@hy.example.net:8443?sni=hy.example.net#H"))
         val config = Json.parseToJsonElement(
             ConfigBuilder.build(
-                proxies = proxies + EngineProxy("p3", awg.outboundJson(), tunnelEndpoint = true),
+                proxies = proxies + ProxyProtocol.HYSTERIA2.engineProxy("p3", hysteria.outboundJson()),
+                activeProxyTag = "p3",
+                byeDpiPackages = emptyList(),
+                vpnPackages = listOf("org.telegram"),
+                tunneledPackages = listOf("org.telegram"),
+                byeDpiPort = 1081,
+                probePort = 2080,
+                probeUser = "user",
+                probePass = "pass",
+                options = NetworkOptions(preferredFingerprint = TlsFingerprint.CHROME)
+            )
+        ).jsonObject
+
+        val outbounds = config.getValue("outbounds").jsonArray.map { it.jsonObject }
+        fun tlsOf(tag: String) = outbounds.single { it["tag"]?.jsonPrimitive?.content == tag }.getValue("tls").jsonObject
+        assertFalse(tlsOf("p3").containsKey("utls"))
+        assertEquals("chrome", tlsOf("p1").getValue("utls").jsonObject.getValue("fingerprint").jsonPrimitive.content)
+    }
+
+    @Test
+    fun amneziaWgProfileIsEmittedAsEndpoint() {
+        val awg = requireNotNull(LinkParser.parse(AWG_CONFIG))
+        val config = Json.parseToJsonElement(
+            ConfigBuilder.build(
+                proxies = proxies + ProxyProtocol.AMNEZIAWG.engineProxy("p3", awg.outboundJson()),
                 activeProxyTag = "p3",
                 byeDpiPackages = emptyList(),
                 vpnPackages = listOf("org.telegram"),

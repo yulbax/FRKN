@@ -2,9 +2,9 @@ package io.github.yulbax.frkn.data.profile
 
 import androidx.room.Room
 import io.github.yulbax.frkn.data.AppDatabase
+import io.github.yulbax.frkn.proxy.ParsedProfile
+import io.github.yulbax.frkn.proxy.ProxyProtocol
 import io.github.yulbax.frkn.util.AppLog
-import io.github.yulbax.frkn.util.ParsedProfile
-import io.github.yulbax.frkn.util.ProxyProtocol
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -51,6 +51,26 @@ class ProfileRefreshTest {
         val peer = endpoint.getValue("peers").jsonArray.single().jsonObject
         assertEquals(25, peer.getValue("persistent_keepalive_interval").jsonPrimitive.content.toInt())
         assertEquals("aPresharedKey=", peer.getValue("preshared_key").jsonPrimitive.content)
+    }
+
+    @Test
+    fun movesAPlainConfStoredAsAmneziaWgOverToWireGuard() = runBlocking {
+        database.profileDao().insert(
+            ProfileEntity(
+                name = "Home",
+                type = ProxyProtocol.AMNEZIAWG.wire,
+                link = PLAIN_CONF,
+                outboundJson = """{"type":"awg","address":["10.8.1.2/32"],"private_key":"aPrivateKey=","peers":[]}"""
+            )
+        )
+
+        repository.refreshDescriptors()
+
+        val stored = database.profileDao().getAll().single()
+        assertEquals(ProxyProtocol.WIREGUARD.wire, stored.type)
+        val endpoint = kotlinx.serialization.json.Json.parseToJsonElement(stored.outboundJson).jsonObject
+        assertEquals("wireguard", endpoint.getValue("type").jsonPrimitive.content)
+        assertEquals("Home", stored.name)
     }
 
     @Test
@@ -116,6 +136,17 @@ class ProfileRefreshTest {
         const val STALE_DESCRIPTOR = """{"type":"wireguard","address":["10.8.1.2/32"],"private_key":"aPrivateKey=",""" +
             """"peers":[{"address":"vpn.example.com","port":51820,"public_key":"aPublicKey=",""" +
             """"pre_shared_key":"aPresharedKey=","allowed_ips":["0.0.0.0/0"],"persistent_keepalive_interval":"25-35"}]}"""
+
+        val PLAIN_CONF = """
+            [Interface]
+            Address = 10.8.1.2/32
+            PrivateKey = aPrivateKey=
+
+            [Peer]
+            PublicKey = aPublicKey=
+            AllowedIPs = 0.0.0.0/0
+            Endpoint = vpn.example.com:51820
+        """.trimIndent()
 
         val AWG_CONFIG = """
             [Interface]

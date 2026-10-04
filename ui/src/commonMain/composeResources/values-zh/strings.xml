@@ -35,6 +35,7 @@
     <string name="direct_dns">直连 DNS（底层网络）</string>
     <string name="sniff_destination">嗅探目标</string>
     <string name="bypass_lan">绕过局域网（私有 IP 直连）</string>
+    <string name="route_all_traffic">所有流量通过 VPN</string>
     <string name="byedpi_cli_args">ByeDPI 命令行</string>
     <string name="show_system_apps">显示系统应用</string>
     <string name="autostart_title">自动连接</string>

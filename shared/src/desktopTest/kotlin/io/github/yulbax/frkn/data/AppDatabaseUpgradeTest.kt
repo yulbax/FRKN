@@ -4,7 +4,7 @@ import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import io.github.yulbax.frkn.data.profile.ProfileEntity
-import io.github.yulbax.frkn.util.ProxyProtocol
+import io.github.yulbax.frkn.proxy.ProxyProtocol
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -31,6 +31,7 @@ class AppDatabaseUpgradeTest {
             assertEquals(1500, settings.mtu)
             assertEquals("", settings.preferredFingerprint)
             assertFalse(settings.homeHintSeen)
+            assertFalse(settings.routeAllTraffic)
             assertSeededRows(database)
         }
         open().useDatabase { database -> assertSeededRows(database) }
@@ -43,6 +44,7 @@ class AppDatabaseUpgradeTest {
         open().useDatabase { database ->
             val settings = requireNotNull(database.settingsDao().getSettings())
             assertEquals("chrome", settings.preferredFingerprint)
+            assertFalse(settings.routeAllTraffic)
             assertSeededRows(database)
         }
     }

@@ -27,6 +27,7 @@ import androidx.core.graphics.createBitmap
 import androidx.core.os.LocaleListCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.text.PlatformTextStyle
 
 @Composable
 actual fun rememberShowMessage(): (String) -> Unit {
@@ -160,3 +161,7 @@ actual object AppLocale {
         )
     }
 }
+
+actual val supportsRouteAllTraffic: Boolean = false
+
+actual val platformTextStyle: PlatformTextStyle? = null

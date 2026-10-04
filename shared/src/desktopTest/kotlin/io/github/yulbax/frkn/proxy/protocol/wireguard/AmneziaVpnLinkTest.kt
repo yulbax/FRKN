@@ -1,5 +1,7 @@
-package io.github.yulbax.frkn.util
+package io.github.yulbax.frkn.proxy.protocol.wireguard
 
+import io.github.yulbax.frkn.proxy.LinkParser
+import io.github.yulbax.frkn.proxy.ProxyProtocol
 import java.io.ByteArrayOutputStream
 import java.util.zip.Deflater
 import kotlinx.serialization.json.jsonArray
@@ -14,7 +16,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
-class AmneziaLinkTest {
+class AmneziaVpnLinkTest {
 
     @Test
     fun parsesAmneziaLinkIntoAmneziaWgEndpoint() {

@@ -1,6 +1,6 @@
 package io.github.yulbax.frkn.data
 
-import io.github.yulbax.frkn.util.LinkParser
+import io.github.yulbax.frkn.proxy.LinkParser
 import io.github.yulbax.frkn.vpn.core.Ipv6Mode
 import io.github.yulbax.frkn.vpn.core.NetworkOptions
 import io.github.yulbax.frkn.vpn.core.TlsFingerprint
@@ -9,10 +9,8 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.URI
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 object BackupCodec {
@@ -101,23 +99,12 @@ object BackupCodec {
         val outbound = runCatching { json.parseToJsonElement(profile.outboundJson) as? JsonObject }
             .getOrNull() ?: return false
         val type = runCatching { outbound["type"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-        val (server, port) = outbound.endpoint()
-        val (parsedServer, parsedPort) = parsed.outbound.endpoint()
+        val handler = parsed.protocol.handler
+        val server = handler.server(outbound) ?: return false
         return type == parsed.outbound["type"]?.jsonPrimitive?.contentOrNull &&
-            server == parsedServer &&
-            port == parsedPort &&
-            !server.isNullOrBlank() &&
-            port != null &&
-            port in 1..65535
-    }
-
-    private fun JsonObject.endpoint(): Pair<String?, Int?> {
-        val peer = (this["peers"] as? JsonArray)?.firstOrNull() as? JsonObject
-        val source = peer ?: this
-        val serverKey = if (peer != null) "address" else "server"
-        val portKey = if (peer != null) "port" else "server_port"
-        return runCatching { source[serverKey]?.jsonPrimitive?.contentOrNull }.getOrNull() to
-            runCatching { source[portKey]?.jsonPrimitive?.intOrNull }.getOrNull()
+            server == handler.server(parsed.outbound) &&
+            server.host.isNotBlank() &&
+            server.port in 1..65535
     }
 
     private fun isValidSubscriptionUrl(value: String): Boolean {

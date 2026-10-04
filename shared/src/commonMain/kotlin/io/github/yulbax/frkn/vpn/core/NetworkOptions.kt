@@ -8,7 +8,8 @@ data class NetworkOptions(
     val dnsDirect: String = "1.1.1.1",
     val sniff: Boolean = true,
     val bypassLan: Boolean = false,
-    val preferredFingerprint: TlsFingerprint? = null
+    val preferredFingerprint: TlsFingerprint? = null,
+    val routeAllTraffic: Boolean = false
 ) {
     companion object {
         val DEFAULT = NetworkOptions()

@@ -1,5 +1,7 @@
 package io.github.yulbax.frkn.util
 
+import io.github.yulbax.frkn.proxy.ProxyProtocol
+
 private val SENSITIVE_URI = Regex(
     "(?i)\\b(https?|${ProxyProtocol.allSchemes.joinToString("|")})://[^\\s)\\]}]+"
 )

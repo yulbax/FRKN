@@ -2,7 +2,7 @@ package io.github.yulbax.frkn.data.profile
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import io.github.yulbax.frkn.util.ProxyProtocol
+import io.github.yulbax.frkn.proxy.ProxyProtocol
 
 @Entity(tableName = "profiles")
 data class ProfileEntity(

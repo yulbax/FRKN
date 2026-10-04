@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import java.io.InputStream
+import androidx.compose.ui.text.PlatformTextStyle
 
 interface Sharer {
     fun shareText(text: String, title: String)
@@ -44,3 +45,7 @@ expect object AppLocale {
 
     fun apply(tag: String?)
 }
+
+expect val supportsRouteAllTraffic: Boolean
+
+expect val platformTextStyle: PlatformTextStyle?

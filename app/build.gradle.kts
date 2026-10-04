@@ -1,7 +1,6 @@
-import java.io.File
+import com.android.build.api.variant.FilterConfiguration
+import com.android.build.api.variant.impl.VariantOutputImpl
 import java.net.URI
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -165,32 +164,16 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     dependsOn(verifyReleaseSigning)
 }
 
-val renameReleaseApks = tasks.register("renameReleaseApks") {
-    group = "build"
-    description = "Renames release APKs to FRKN-<version>-<abi>.apk."
-    inputs.dir(layout.buildDirectory.dir("outputs/apk/release"))
-        .withPropertyName("releaseApks")
-    inputs.property("versionName", android.defaultConfig.versionName.orEmpty())
-
-    doLast {
-        val version = inputs.properties.getValue("versionName")
-        val pattern = Regex("app-(.+)-release\\.apk")
-        var renamed = 0
-        inputs.files.files.filter(File::isFile).forEach { file ->
-            val abi = pattern.find(file.name)?.groupValues?.get(1) ?: return@forEach
-            val target = File(file.parentFile, "FRKN-$version-$abi.apk")
-            Files.move(
-                file.toPath(),
-                target.toPath(),
-                StandardCopyOption.REPLACE_EXISTING
-            )
-            renamed++
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs.forEach { output ->
+            val abi = output.filters
+                .firstOrNull { it.filterType == FilterConfiguration.FilterType.ABI }
+                ?.identifier ?: "universal"
+            (output as VariantOutputImpl).outputFileName.set(output.versionName.map { "FRKN-$it-$abi.apk" })
         }
-        check(renamed > 0) { "No release APKs matched ${pattern.pattern}" }
     }
 }
-
-tasks.matching { it.name == "assembleRelease" }.configureEach { finalizedBy(renameReleaseApks) }
 
 dependencies {
     implementation(project(":shared"))

@@ -1,5 +1,7 @@
-package io.github.yulbax.frkn.util
+package io.github.yulbax.frkn.proxy.protocol.wireguard
 
+import io.github.yulbax.frkn.proxy.LinkParser
+import io.github.yulbax.frkn.proxy.ProxyProtocol
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -9,7 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class AmneziaWgParserTest {
+class AmneziaWgTest {
 
     @Test
     fun parsesAmneziaWgConfigIntoWireguardEndpoint() {
@@ -45,11 +47,13 @@ class AmneziaWgParserTest {
     }
 
     @Test
-    fun keepsPlainWireguardConfigWithoutObfuscation() {
-        val parsed = requireNotNull(LinkParser.parse(CONFIG.lines().filterNot { it.startsWith("J") || it.startsWith("S") || it.startsWith("H") }.joinToString("\n")))
+    fun leavesAConfigWithoutObfuscationToPlainWireguard() {
+        val plain = CONFIG.lines().filterNot { it.startsWith("J") || it.startsWith("S") || it.startsWith("H") }.joinToString("\n")
+        val parsed = requireNotNull(LinkParser.parse(plain))
 
-        assertEquals(ProxyProtocol.AMNEZIAWG, parsed.protocol)
-        assertTrue(parsed.outbound.keys.none { it.startsWith("j") || it.startsWith("h") })
+        assertEquals(ProxyProtocol.WIREGUARD, parsed.protocol)
+        assertEquals("wireguard", parsed.outbound.getValue("type").jsonPrimitive.content)
+        assertFalse(AmneziaWg.recognizes(plain))
     }
 
     @Test

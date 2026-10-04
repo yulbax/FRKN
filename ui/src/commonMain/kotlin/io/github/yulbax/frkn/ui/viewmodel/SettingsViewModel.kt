@@ -43,6 +43,7 @@ class SettingsViewModel(
     fun setDnsDirect(value: String) = updateNetwork { it.copy(dnsDirect = value.trim()) }
     fun setSniff(value: Boolean) = updateNetwork { it.copy(sniff = value) }
     fun setBypassLan(value: Boolean) = updateNetwork { it.copy(bypassLan = value) }
+    fun setRouteAllTraffic(value: Boolean) = updateNetwork { it.copy(routeAllTraffic = value) }
     fun setPreferredFingerprint(value: TlsFingerprint?) = updateNetwork { it.copy(preferredFingerprint = value) }
 
     fun exportConfig(selection: BackupSelection, onReady: (String) -> Unit) {

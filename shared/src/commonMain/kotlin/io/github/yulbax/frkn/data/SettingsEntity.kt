@@ -22,7 +22,8 @@ data class SettingsEntity(
     val autoConnect: Boolean = false,
     val preferredFingerprint: String = NetworkOptions.DEFAULT.preferredFingerprint?.wire ?: "",
     val homeHintSeen: Boolean = false,
-    val appsHintSeen: Boolean = false
+    val appsHintSeen: Boolean = false,
+    val routeAllTraffic: Boolean = NetworkOptions.DEFAULT.routeAllTraffic
 ) {
     fun networkOptions(): NetworkOptions = NetworkOptions(
         tunStack = TunStack.fromWire(tunStack),
@@ -32,7 +33,8 @@ data class SettingsEntity(
         dnsDirect = dnsDirect,
         sniff = sniff,
         bypassLan = bypassLan,
-        preferredFingerprint = TlsFingerprint.fromWire(preferredFingerprint)
+        preferredFingerprint = TlsFingerprint.fromWire(preferredFingerprint),
+        routeAllTraffic = routeAllTraffic
     )
 
     fun withNetworkOptions(options: NetworkOptions): SettingsEntity = copy(
@@ -43,6 +45,7 @@ data class SettingsEntity(
         dnsDirect = options.dnsDirect,
         sniff = options.sniff,
         bypassLan = options.bypassLan,
-        preferredFingerprint = options.preferredFingerprint?.wire ?: ""
+        preferredFingerprint = options.preferredFingerprint?.wire ?: "",
+        routeAllTraffic = options.routeAllTraffic
     )
 }

@@ -19,8 +19,8 @@ concurrency:
 
 env:
   SING_BOX_TAG: "v1.260910.0"
-  LIBBOX_CACHE_REV: "7"    # bump to force a fresh libbox.aar rebuild (busts the cache)
-  GO_VERSION: "1.24.7"
+  LIBBOX_CACHE_REV: "8"    # bump to force a fresh libbox.aar rebuild (busts the cache)
+  GO_VERSION: "1.25.0"
   NDK_VERSION: "28.0.13004108"
   ANDROID_COMPILE_SDK: "37.0"
   BUILD_TOOLS: "36.1.0"
@@ -63,7 +63,9 @@ jobs:
       - id: cache
         uses: actions/cache@v4
         with:
-          path: app/libs/libbox.aar
+          path: |
+            app/libs/libbox.aar
+            desktop/libs/windows
           key: libbox-${{ env.SING_BOX_TAG }}-${{ env.LIBBOX_CACHE_REV }}
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-go@v5
@@ -90,6 +92,11 @@ jobs:
         with:
           name: libbox
           path: app/libs/libbox.aar
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-core
+          path: desktop/libs/windows
           retention-days: 1
 
   quality:
@@ -156,10 +163,14 @@ jobs:
           retention-days: 7
 
   windows:
-    needs: check
+    needs: [check, libbox]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-core
+          path: desktop/libs/windows
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

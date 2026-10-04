@@ -1,7 +1,7 @@
 package io.github.yulbax.frkn.data
 
 import io.github.yulbax.frkn.data.profile.ProfileRepository
-import io.github.yulbax.frkn.util.LinkParser
+import io.github.yulbax.frkn.proxy.LinkParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -83,7 +83,10 @@ class ConfigBackupRepository(
     ): ImportResult {
         val apps = backup.apps?.takeIf { selection.apps }?.let { applyApps(it) }
         val settings = backup.settings?.takeIf { selection.settings }
-        settings?.let { database.settingsDao().upsertSettings(it.toEntity()) }
+        settings?.let { imported ->
+            val routeAllTraffic = database.settingsDao().getSettings()?.routeAllTraffic ?: false
+            database.settingsDao().upsertSettings(imported.toEntity().copy(routeAllTraffic = routeAllTraffic))
+        }
         val profiles = backup.profiles?.takeIf { selection.profiles }?.let { applyProfiles(it) }
         return ImportResult(
             applied = apps?.applied ?: 0,

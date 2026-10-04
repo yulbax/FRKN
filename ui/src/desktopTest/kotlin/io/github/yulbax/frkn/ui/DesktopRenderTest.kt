@@ -21,6 +21,7 @@ import io.github.yulbax.frkn.data.InstalledAppsSource
 import io.github.yulbax.frkn.data.SettingsRepository
 import io.github.yulbax.frkn.data.profile.ProfileRepository
 import io.github.yulbax.frkn.data.profile.SubscriptionProfileSource
+import io.github.yulbax.frkn.proxy.ParsedProfile
 import io.github.yulbax.frkn.ui.di.uiModule
 import io.github.yulbax.frkn.ui.screens.About
 import io.github.yulbax.frkn.ui.screens.License
@@ -30,7 +31,6 @@ import io.github.yulbax.frkn.ui.screens.apps.Apps
 import io.github.yulbax.frkn.ui.screens.settings.Settings
 import io.github.yulbax.frkn.ui.theme.FRKNTheme
 import io.github.yulbax.frkn.util.AppLog
-import io.github.yulbax.frkn.util.ParsedProfile
 import io.github.yulbax.frkn.util.DiagnosticsSource
 import io.github.yulbax.frkn.util.VersionInfo
 import io.github.yulbax.frkn.util.VpnLauncher

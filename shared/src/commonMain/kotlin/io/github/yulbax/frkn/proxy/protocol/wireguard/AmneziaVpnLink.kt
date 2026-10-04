@@ -1,26 +1,26 @@
-package io.github.yulbax.frkn.util
+package io.github.yulbax.frkn.proxy.protocol.wireguard
 
+import io.github.yulbax.frkn.proxy.ParsedLink
 import java.io.ByteArrayOutputStream
 import java.util.zip.Inflater
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
-object AmneziaLink {
-    private const val SCHEME = "vpn://"
+internal object AmneziaVpnLink {
+    const val SCHEME = "vpn"
     private const val SIZE_PREFIX_BYTES = 4
     private const val MAX_PAYLOAD_BYTES = 1 shl 20
     private val WIREGUARD_CONTAINERS = listOf("awg", "wireguard")
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun parse(link: String): ParsedProfile {
-        val payload = decode(link.removePrefix(SCHEME).trim())
+    fun parse(link: String): ParsedLink {
+        val payload = decode(link.removePrefix("$SCHEME://").trim())
         val root = json.parseToJsonElement(payload).jsonObject
         val container = wireguardContainer(root) ?: error("no AmneziaWG container in link")
         val lastConfig = json.parseToJsonElement(
@@ -28,14 +28,14 @@ object AmneziaLink {
         ).jsonObject
         val configText = lastConfig["config"]?.jsonPrimitive?.content ?: error("last_config has no config")
 
-        val parsed = AmneziaWgParser.parse(
+        val config = WgIni.parse(
             configText,
             fallbackMtu = lastConfig["mtu"]?.jsonPrimitive?.content?.toIntOrNull()
         )
         val name = root["description"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
             ?: root["hostName"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-            ?: parsed.name
-        return ParsedProfile(name, ProxyProtocol.AMNEZIAWG, parsed.outbound, link)
+            ?: config.host
+        return ParsedLink(name, AmneziaWg.descriptor(config))
     }
 
     private fun wireguardContainer(root: JsonObject): JsonObject? {

@@ -1,7 +1,7 @@
 package io.github.yulbax.frkn.data.profile
 
-import io.github.yulbax.frkn.util.ParsedProfile
-import io.github.yulbax.frkn.util.SubscriptionParser
+import io.github.yulbax.frkn.proxy.ParsedProfile
+import io.github.yulbax.frkn.proxy.SubscriptionParser
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI

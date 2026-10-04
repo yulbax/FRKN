@@ -1,4 +1,4 @@
-package io.github.yulbax.frkn.util
+package io.github.yulbax.frkn.proxy
 
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive

@@ -12,6 +12,12 @@ import java.io.File
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.FontRasterizationSettings
+import androidx.compose.ui.text.FontSmoothing
+import androidx.compose.ui.text.PlatformParagraphStyle
+import androidx.compose.ui.text.PlatformTextStyle
+import java.awt.RenderingHints
 
 @Composable
 actual fun rememberShowMessage(): (String) -> Unit = LocalMessages.current
@@ -68,4 +74,29 @@ private fun chooseFile(title: String, mode: Int, suggestedName: String?): File? 
     dialog.isVisible = true
     val name = dialog.file ?: return null
     return File(dialog.directory, name)
+}
+
+actual val supportsRouteAllTraffic: Boolean = true
+
+@OptIn(ExperimentalTextApi::class)
+actual val platformTextStyle: PlatformTextStyle? by lazy {
+    if (!systemUsesRgbClearType()) return@lazy null
+    val defaults = FontRasterizationSettings.PlatformDefault
+    PlatformTextStyle(
+        spanStyle = null,
+        paragraphStyle = PlatformParagraphStyle(
+            FontRasterizationSettings(
+                smoothing = FontSmoothing.SubpixelAntiAlias,
+                hinting = defaults.hinting,
+                subpixelPositioning = defaults.subpixelPositioning,
+                autoHintingForced = defaults.autoHintingForced
+            )
+        )
+    )
+}
+
+private fun systemUsesRgbClearType(): Boolean {
+    val hints = runCatching { Toolkit.getDefaultToolkit().getDesktopProperty("awt.font.desktophints") }
+        .getOrNull() as? Map<*, *> ?: return false
+    return hints[RenderingHints.KEY_TEXT_ANTIALIASING] == RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB
 }

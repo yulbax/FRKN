@@ -21,17 +21,19 @@ enum class ConnectionType(val wire: String) {
 
 data class RoutedApps(
     val byeDpiPackages: List<String>,
-    val vpnPackages: List<String>
+    val vpnPackages: List<String>,
+    val routeAllTraffic: Boolean = false
 ) {
     val tunneledPackages: List<String> get() = byeDpiPackages + vpnPackages
     val hasByeDpi: Boolean get() = byeDpiPackages.isNotEmpty()
-    val hasVpn: Boolean get() = vpnPackages.isNotEmpty()
+    val hasVpn: Boolean get() = vpnPackages.isNotEmpty() || routeAllTraffic
     val isEmpty: Boolean get() = !hasByeDpi && !hasVpn
 
     companion object {
-        fun from(apps: List<App>): RoutedApps = RoutedApps(
+        fun from(apps: List<App>, routeAllTraffic: Boolean = false): RoutedApps = RoutedApps(
             byeDpiPackages = apps.packagesOf(ConnectionType.BYEDPI),
-            vpnPackages = apps.packagesOf(ConnectionType.VPN)
+            vpnPackages = apps.packagesOf(ConnectionType.VPN),
+            routeAllTraffic = routeAllTraffic
         )
 
         private fun List<App>.packagesOf(type: ConnectionType): List<String> =

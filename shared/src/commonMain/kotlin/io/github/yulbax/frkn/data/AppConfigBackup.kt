@@ -1,7 +1,7 @@
 package io.github.yulbax.frkn.data
 
 import io.github.yulbax.frkn.data.profile.ProfileEntity
-import io.github.yulbax.frkn.util.ParsedProfile
+import io.github.yulbax.frkn.proxy.ParsedProfile
 import kotlinx.serialization.Serializable
 
 /** Stable external format. Room entities must not become part of this contract. */

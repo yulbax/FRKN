@@ -9,7 +9,7 @@ variables:
   CMDLINE_TOOLS_VERSION: "11076708"
   SING_BOX_TAG: "v1.260910.0"
   LIBBOX_CACHE_REV: "7"
-  GO_VERSION: "1.24.7"
+  GO_VERSION: "1.25.0"
   GOPATH: "${CI_PROJECT_DIR}/.go"
   GOCACHE: "${CI_PROJECT_DIR}/.gocache"
   GOTOOLCHAIN: "local"
@@ -116,7 +116,7 @@ libbox:
     - go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.13
     - go install github.com/sagernet/gomobile/cmd/gobind@v0.1.13
     - export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
-    - bash scripts/build-libbox.sh
+    - CORE_TARGETS=android bash scripts/build-libbox.sh
   artifacts:
     paths:
       - app/libs/libbox.aar

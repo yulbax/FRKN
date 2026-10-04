@@ -43,6 +43,7 @@ import io.github.yulbax.frkn.ui.viewmodel.SettingsViewModel
 import io.github.yulbax.frkn.ui.platform.rememberFilePicker
 import io.github.yulbax.frkn.ui.platform.rememberSharer
 import io.github.yulbax.frkn.ui.platform.rememberShowMessage
+import io.github.yulbax.frkn.ui.platform.supportsRouteAllTraffic
 import io.github.yulbax.frkn.ui.platform.rememberSystemVpnSettings
 import kotlinx.coroutines.launch
 import io.github.yulbax.frkn.vpn.core.Ipv6Mode
@@ -118,7 +119,7 @@ internal fun NetworkSection(ui: SettingsUiState, viewModel: SettingsViewModel) {
 
     GroupCard(
         title = stringResource(Res.string.network_title),
-        items = listOf(
+        items = listOfNotNull(
             {
                 DropdownSetting(
                     label = stringResource(Res.string.tls_fingerprint),
@@ -173,6 +174,15 @@ internal fun NetworkSection(ui: SettingsUiState, viewModel: SettingsViewModel) {
             },
             {
                 SwitchRow(stringResource(Res.string.bypass_lan), network.bypassLan) { viewModel.setBypassLan(it) }
+            },
+            if (supportsRouteAllTraffic) {
+                {
+                    SwitchRow(stringResource(Res.string.route_all_traffic), network.routeAllTraffic) {
+                        viewModel.setRouteAllTraffic(it)
+                    }
+                }
+            } else {
+                null
             }
         )
     )
