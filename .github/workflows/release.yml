@@ -185,11 +185,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Desktop tests and MSI
         shell: bash
-        run: ./gradlew -Pfrkn.desktopOnly :shared:desktopTest :ui:desktopTest :desktop:packageMsi --no-daemon
+        run: ./gradlew -Pfrkn.desktopOnly :shared:desktopTest :ui:desktopTest :desktop:packageReleaseMsi --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: msi
-          path: desktop/build/compose/binaries/main/msi/*.msi
+          path: desktop/build/compose/binaries/main-release/msi/*.msi
           retention-days: 7
 
   # ── Create the tag + GitHub Release with the four APKs and the MSI attached. ─────────────────

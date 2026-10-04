@@ -1,10 +1,13 @@
 package io.github.yulbax.frkn.desktop
 
+import androidx.compose.foundation.window.WindowDraggableArea
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.yulbax.frkn.data.SettingsRepository
@@ -32,16 +35,34 @@ fun main() {
 
     application {
         val icon = remember { BitmapPainter(Image.makeFromEncoded(appIconBytes()).toComposeImageBitmap()) }
+        val state = rememberWindowState(width = 440.dp, height = 860.dp)
+        val close = {
+            controller.shutdown()
+            exitApplication()
+        }
         Window(
-            onCloseRequest = {
-                controller.shutdown()
-                exitApplication()
-            },
+            onCloseRequest = close,
             title = "FRKN",
             icon = icon,
-            state = rememberWindowState(width = 440.dp, height = 860.dp)
+            undecorated = true,
+            state = state
         ) {
-            FRKNTheme { MainScreen() }
+            LaunchedEffect(Unit) {
+                window.minimumSize = WindowLimits.minimum
+                WindowLimits.clampWidth(window)
+                WindowsDwm.roundCorners(window)
+            }
+            LaunchedEffect(state.placement) {
+                if (state.placement != WindowPlacement.Floating) state.placement = WindowPlacement.Floating
+            }
+            FRKNTheme {
+                WindowFrame {
+                    MainScreen(
+                        topBarFrame = { bar -> WindowDraggableArea { bar() } },
+                        topBarActions = { CaptionButtons(onClose = close) }
+                    )
+                }
+            }
         }
     }
 }

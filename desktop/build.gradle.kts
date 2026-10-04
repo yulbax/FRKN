@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.kotlinx.coroutines.swing)
     implementation(libs.jna)
+    implementation(libs.jetbrains.compose.material.icons.extended)
     testImplementation(libs.junit)
 }
 
@@ -76,6 +77,12 @@ compose.desktop {
     application {
         mainClass = "io.github.yulbax.frkn.desktop.MainKt"
         jvmArgs += listOf("-Dfrkn.version=$appVersion", "-Dfrkn.byedpi.version=$byeDpiVersion")
+
+        buildTypes.release.proguard {
+            isEnabled.set(true)
+            obfuscate.set(false)
+            configurationFiles.from(project.file("proguard-rules.pro"))
+        }
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi)

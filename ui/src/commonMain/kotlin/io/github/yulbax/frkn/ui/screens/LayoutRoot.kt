@@ -1,6 +1,7 @@
 package io.github.yulbax.frkn.ui.screens
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,7 +46,10 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    topBarFrame: @Composable (content: @Composable () -> Unit) -> Unit = { it() },
+    topBarActions: @Composable RowScope.() -> Unit = {}
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -97,32 +101,35 @@ fun MainScreen() {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                TopAppBar(
-                    title = {
-                        if (onAppsScreen) {
-                            AppSearchBar(
-                                query = appsQuery,
-                                onQueryChange = { appsQuery = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                            )
-                        } else {
-                            Text(
-                                text = stringResource(currentScreen.title),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                imageVector = Icons.Filled.Menu,
-                                contentDescription = stringResource(Res.string.open_menu_cd)
-                            )
-                        }
-                    }
-                )
+                topBarFrame {
+                    TopAppBar(
+                        title = {
+                            if (onAppsScreen) {
+                                AppSearchBar(
+                                    query = appsQuery,
+                                    onQueryChange = { appsQuery = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(currentScreen.title),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Menu,
+                                    contentDescription = stringResource(Res.string.open_menu_cd)
+                                )
+                            }
+                        },
+                        actions = topBarActions
+                    )
+                }
             }
         ) { innerPadding ->
             CompositionLocalProvider(LocalMessages provides showMessage) {

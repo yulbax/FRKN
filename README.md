@@ -88,7 +88,7 @@ CORE_TARGETS=windows bash scripts/build-libbox.sh   # → desktop/libs/windows/f
 The installer itself must be built on Windows with JDK 21:
 
 ```bash
-./gradlew -Pfrkn.desktopOnly :desktop:packageMsi
+./gradlew -Pfrkn.desktopOnly :desktop:packageReleaseMsi
 ```
 
 `-Pfrkn.desktopOnly` skips the Android modules, so no Android SDK is needed there.

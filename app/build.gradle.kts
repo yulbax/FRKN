@@ -119,6 +119,7 @@ android {
     packaging {
         jniLibs {
             excludes += "lib/x86/**"
+            useLegacyPackaging = true
         }
     }
 }
