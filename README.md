@@ -4,13 +4,24 @@
 
 # FRKN
 
-**A per-app split VPN for Android.**
+**A per-app split VPN for Android and Windows.**
 
 </div>
 
-FRKN tunnels each installed app independently. Instead of an all-or-nothing VPN switch,
+FRKN tunnels each app independently. Instead of an all-or-nothing VPN switch,
 you decide — per app — whether traffic should go through a proxy, through a built-in
 DPI-bypass engine, or straight out untouched. All three can run at the same time.
+
+## Download
+
+Get the latest APKs and the Windows installer from
+[Releases](https://github.com/yulbax/FRKN/releases/latest).
+
+- **Android** — `FRKN-<version>-arm64-v8a.apk` fits almost every modern phone;
+  `universal` works everywhere. Android 10 or newer.
+- **Windows** — `FRKN-<version>.msi`, Windows 10/11 x64. The app needs administrator
+  rights to create the tunnel and asks for them on launch. To update, close FRKN and
+  install the newer MSI over the old one; settings and servers are kept.
 
 ## Features
 
@@ -20,49 +31,74 @@ DPI-bypass engine, or straight out untouched. All three can run at the same time
   - **ByeDPI** — routed through a built-in engine that defeats DPI-based censorship
     locally, without any remote server.
 - **Wide protocol support.** Import servers from `vless`, `vmess`, `trojan`,
-  `shadowsocks` and `hysteria2` share links or a subscription URL.
-- **Modern transports.** TCP, WebSocket, gRPC and HTTPUpgrade, with TLS / Reality and
-  configurable uTLS fingerprints.
+  `shadowsocks`, `hysteria2` and `wireguard` share links, AmneziaWG `vpn://` links,
+  WireGuard / AmneziaWG `.conf` files, or a subscription URL.
+- **Modern transports.** TCP, WebSocket, gRPC, HTTP and HTTPUpgrade, with TLS / Reality
+  and configurable uTLS fingerprints.
+- **Windows extras.** Apps are matched by process name; an optional mode sends all
+  traffic that has no explicit rule through the VPN.
 - **Stays out of the way.** No system-wide proxy, no exposed control API, optional
-  auto-connect on boot, and a built-in connection health check.
+  auto-connect, and a built-in connection health check.
 
 ## How it works
 
-FRKN combines two engines behind a single VPN interface:
+FRKN combines two engines behind a single tunnel interface:
 
-- **[sing-box](https://github.com/SagerNet/sing-box)** owns the tunnel and dispatches
-  traffic per app — *VPN* apps to the upstream server, *ByeDPI* apps to the local bypass
-  proxy. *Direct* apps are excluded from the tunnel entirely, so they never touch the
-  engine.
-- **[ByeDPI](https://github.com/hufrea/byedpi)** runs as an embedded local proxy that
+- **sing-box** owns the tunnel and dispatches traffic per app — *VPN* apps to the
+  upstream server, *ByeDPI* apps to the local bypass proxy, *Direct* apps straight out.
+  FRKN uses [amnezia-box](https://github.com/amnezia-vpn/amnezia-box), the Amnezia fork
+  of [sing-box](https://github.com/SagerNet/sing-box) that adds AmneziaWG. The same core
+  is embedded on both platforms: as a Go Mobile library on Android and as
+  `frkn-core.dll` on Windows.
+- **[ByeDPI](https://github.com/hufrea/byedpi)** runs as a local proxy that
   desynchronizes packets to slip past Deep Packet Inspection.
 
 ## Building
 
 FRKN is fully open-source — no Google services, no proprietary dependencies.
 
-The app depends on a pinned sing-box Go Mobile binding that is built locally rather than
-committed as a binary. Install Go, the SagerNet `gomobile` tools, and point
-`ANDROID_NDK_HOME` at NDK 28 before the first build:
+The sing-box core is built from source by `scripts/build-libbox.sh` rather than committed
+as a binary. It needs Go 1.25.
+
+### Android
+
+Install the SagerNet `gomobile` tools and point `ANDROID_NDK_HOME` at NDK 28:
 
 ```bash
-go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
-go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.13
+go install github.com/sagernet/gomobile/cmd/gobind@v0.1.13
 export PATH="$(go env GOPATH)/bin:$PATH"
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.13004108"
-bash scripts/build-libbox.sh
-./gradlew assembleDebug
+CORE_TARGETS=android bash scripts/build-libbox.sh
+./gradlew assembleRelease
 ```
 
-The app supports Android 10 (API 29) and newer. Building requires Android SDK 37 and
-CMake 3.22.1. A physical device is recommended; Android's VPN APIs are unreliable on
-emulators.
+Building requires Android SDK 37 and CMake 3.22.1. A physical device is recommended;
+Android's VPN APIs are unreliable on emulators.
+
+### Windows
+
+The core DLL is cross-compiled with MinGW (`gcc-mingw-w64-x86-64` on Debian/Ubuntu, or
+any C compiler for Windows set in `WINDOWS_CC`):
+
+```bash
+CORE_TARGETS=windows bash scripts/build-libbox.sh   # → desktop/libs/windows/frkn-core.dll
+```
+
+The installer itself must be built on Windows with JDK 21:
+
+```bash
+./gradlew -Pfrkn.desktopOnly :desktop:packageMsi
+```
+
+`-Pfrkn.desktopOnly` skips the Android modules, so no Android SDK is needed there.
 
 ## Built with
 
-- [sing-box](https://github.com/SagerNet/sing-box) — the VPN core
+- [amnezia-box](https://github.com/amnezia-vpn/amnezia-box) /
+  [sing-box](https://github.com/SagerNet/sing-box) — the VPN core
 - [ByeDPI](https://github.com/hufrea/byedpi) — the DPI-bypass engine
-- Kotlin, Jetpack Compose, Room, Koin, Ktor
+- Kotlin Multiplatform, Compose Multiplatform, Room, Koin, JNA
 
 ## License
 
