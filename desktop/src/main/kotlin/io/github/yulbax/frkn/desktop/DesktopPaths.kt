@@ -17,7 +17,7 @@ object DesktopPaths {
         ?: System.getenv("FRKN_BIN_DIR")?.let(::File)
         ?: File("binaries")
 
-    val singBox: File = File(binDir, executable("sing-box"))
+    val singBoxCore: File = File(binDir, if (isWindows) "frkn-core.dll" else "libfrkn-core.so")
     val ciadpi: File = File(binDir, executable("ciadpi"))
 
     val ownExecutable: String? = ProcessHandle.current().info().command().map { File(it).name }.orElse(null)

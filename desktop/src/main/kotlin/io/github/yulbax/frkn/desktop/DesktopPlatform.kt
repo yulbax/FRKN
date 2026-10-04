@@ -67,21 +67,12 @@ class DesktopDiagnostics(
     }
 }
 
-class DesktopVersionInfo(private val singBox: File) : VersionInfo {
+class DesktopVersionInfo(private val core: SingBoxCore) : VersionInfo {
     override val appVersion: String? = System.getProperty("frkn.version")
     override val byeDpiVersion: String = System.getProperty("frkn.byedpi.version") ?: "unknown"
 
     override suspend fun coreVersion(): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            val process = ProcessBuilder(singBox.absolutePath, "version").redirectErrorStream(true).start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            process.waitFor(5, TimeUnit.SECONDS)
-            VERSION_REGEX.find(output)?.groupValues?.get(1)
-        }.getOrNull()
-    }
-
-    private companion object {
-        val VERSION_REGEX = Regex("version\\s+(\\S+)")
+        runCatching { core.version.ifBlank { null } }.getOrNull()
     }
 }
 

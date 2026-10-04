@@ -13,7 +13,6 @@ import io.github.yulbax.frkn.vpn.core.freeLoopbackPort
 import io.github.yulbax.frkn.vpn.core.randomToken
 import io.github.yulbax.frkn.vpn.singbox.AppRouting
 import io.github.yulbax.frkn.vpn.singbox.ConfigBuilder
-import io.github.yulbax.frkn.vpn.singbox.ControlApi
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
@@ -25,6 +24,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -34,21 +34,20 @@ import kotlin.time.Duration.Companion.seconds
 class DesktopEngineIntegrationTest {
     private val binDir = System.getenv("FRKN_TEST_BIN_DIR")?.let(::File)
     private val workDir = Files.createTempDirectory("frkn-desktop-test").toFile()
-    private val processes = mutableListOf<Process>()
+    private val core by lazy { SingBoxCore(File(binDir, "libfrkn-core.so")) }
 
     @Before
     fun requireBinaries() {
-        assumeTrue("set FRKN_TEST_BIN_DIR to a directory with sing-box and ciadpi", binDir?.isDirectory == true)
+        assumeTrue("set FRKN_TEST_BIN_DIR to a directory with libfrkn-core.so and ciadpi", binDir?.isDirectory == true)
     }
 
     @After
     fun cleanup() {
-        processes.forEach { it.destroyForcibly().waitFor(5, TimeUnit.SECONDS) }
         workDir.deleteRecursively()
     }
 
     @Test
-    fun windowsStyleConfigPassesSingBoxCheck() {
+    fun windowsStyleConfigPassesCoreCheck() {
         val config = ConfigBuilder.build(
             proxies = listOf(EngineProxy("p1", """{"type":"vless","server":"a.example","server_port":443,"uuid":"b5e6f6c2-6f5e-4c57-9a1c-1a9a2e2c3d4e","tls":{"enabled":true,"server_name":"a.example"}}""")),
             activeProxyTag = "p1",
@@ -60,65 +59,56 @@ class DesktopEngineIntegrationTest {
             probeUser = "user",
             probePass = "pass",
             options = NetworkOptions(),
-            routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"), ControlApi(9090, "secret"))
+            routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"))
         )
-        val file = File(workDir, "config.json").apply { writeText(config) }
-        val check = ProcessBuilder(File(binDir, "sing-box").absolutePath, "check", "-c", file.absolutePath)
-            .redirectErrorStream(true).start()
-        val output = check.inputStream.bufferedReader().readText()
-        assertTrue("sing-box check failed: $output", check.waitFor(30, TimeUnit.SECONDS) && check.exitValue() == 0)
+        core.check(config)
+        val failure = runCatching { core.check("""{"outbounds": [{"type": "no-such-type"}]}""") }.exceptionOrNull()
+        assertNotNull("an invalid config must be rejected", failure)
     }
 
     @Test
-    fun clashApiControlsARealSingBoxProcess() {
-        val apiPort = freeLoopbackPort()
+    fun embeddedCoreStartsControlsAndRestartsInProcess() {
         val socksPort = freeLoopbackPort()
-        val secret = randomToken()
         val user = randomToken()
         val pass = randomToken()
-        val config = File(workDir, "api.json").apply {
-            writeText(
-                """
-                {
-                  "log": {"level": "warn"},
-                  "inbounds": [{"type": "socks", "tag": "probe-in", "listen": "127.0.0.1", "listen_port": $socksPort,
-                                "users": [{"username": "$user", "password": "$pass"}]}],
-                  "outbounds": [
-                    {"type": "direct", "tag": "p1"},
-                    {"type": "direct", "tag": "p2"},
-                    {"type": "selector", "tag": "proxy", "outbounds": ["p1", "p2"], "default": "p1"}
-                  ],
-                  "route": {"final": "proxy"},
-                  "experimental": {"clash_api": {"external_controller": "127.0.0.1:$apiPort", "secret": "$secret"}}
-                }
-                """.trimIndent()
-            )
-        }
-        processes += ProcessBuilder(File(binDir, "sing-box").absolutePath, "run", "-c", config.absolutePath)
-            .redirectErrorStream(true).redirectOutput(File(workDir, "out.log")).start()
-
-        val api = ClashApi(apiPort, secret)
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
-        while (!api.isReady() && System.nanoTime() < deadline) Thread.sleep(100)
-        assertTrue(api.isReady())
-        assertFalse(ClashApi(apiPort, "wrong").isReady())
-
-        assertTrue(api.select("proxy", "p2"))
-        assertNotNull(api.delay("p1", ProbeUrls.VPN, 10_000))
-
-        val sample = CountDownLatch(1)
-        val traffic = api.streamTraffic { _, _ -> sample.countDown() }
-        assertTrue(sample.await(10, TimeUnit.SECONDS))
-        traffic.disconnect()
-
-        val snapshot: HealthSnapshot = runBlocking {
-            withTimeout(30.seconds) {
-                SocksHealthProbe(ProbeUrls.VPN, ProbeUrls.BYEDPI)
-                    .observe(ProbeParams(FakeEngine(socksPort, user, pass), byeDpiPort = null, vpnActive = true) { false })
-                    .first()
+        val config = """
+            {
+              "log": {"level": "warn", "output": "box.log"},
+              "inbounds": [{"type": "socks", "tag": "probe-in", "listen": "127.0.0.1", "listen_port": $socksPort,
+                            "users": [{"username": "$user", "password": "$pass"}]}],
+              "outbounds": [
+                {"type": "direct", "tag": "p1"},
+                {"type": "direct", "tag": "p2"},
+                {"type": "selector", "tag": "proxy", "outbounds": ["p1", "p2"], "default": "p1"}
+              ],
+              "route": {"final": "proxy"}
             }
+        """.trimIndent()
+
+        repeat(2) {
+            core.start(config, workDir)
+            try {
+                assertNotNull(runCatching { core.start(config, workDir) }.exceptionOrNull())
+                assertTrue(core.select("proxy", "p2"))
+                assertFalse(core.select("proxy", "missing"))
+                assertNotNull(core.delay("p1", ProbeUrls.VPN, 10_000))
+
+                val snapshot: HealthSnapshot = runBlocking {
+                    withTimeout(30.seconds) {
+                        SocksHealthProbe(ProbeUrls.VPN, ProbeUrls.BYEDPI)
+                            .observe(ProbeParams(FakeEngine(socksPort, user, pass), byeDpiPort = null, vpnActive = true) { false })
+                            .first()
+                    }
+                }
+                assertTrue("probe through authenticated SOCKS failed", snapshot.vpnUp)
+                val traffic = checkNotNull(core.traffic())
+                assertTrue("traffic must be counted", traffic.down > 0)
+            } finally {
+                core.stop()
+            }
+            assertNull(core.traffic())
+            assertTrue(File(workDir, "box.log").isFile)
         }
-        assertTrue("probe through authenticated SOCKS failed", snapshot.vpnUp)
     }
 
     @Test

@@ -27,6 +27,7 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.kotlinx.coroutines.swing)
+    implementation(libs.jna)
     testImplementation(libs.junit)
 }
 
@@ -42,7 +43,7 @@ val prepareWindowsBinaries = tasks.register("prepareWindowsBinaries") {
         "70d2c94147193cb915f9c6eb5144b8d404dacbcfa90bda2383b6b211afafa456",
         mapOf("ciadpi.exe" to "ciadpi.exe")
     )
-    val coreFiles = listOf("sing-box.exe", "sing-box-LICENSE.txt").map { windowsCoreDir.file(it).asFile }
+    val coreFiles = listOf("frkn-core.dll", "sing-box-LICENSE.txt").map { windowsCoreDir.file(it).asFile }
     val outputDir = bundledResourcesDir.map { it.dir("windows") }
     inputs.property("byeDpiArchive", byeDpiArchive.toString())
     inputs.files(coreFiles).withPropertyName("core").optional()

@@ -21,15 +21,10 @@ sealed interface AppRouting {
         override val appRuleKey: String = "package_name"
     }
 
-    data class DesktopProcesses(
-        val directProcesses: List<String>,
-        val controlApi: ControlApi
-    ) : AppRouting {
+    data class DesktopProcesses(val directProcesses: List<String>) : AppRouting {
         override val appRuleKey: String = "process_name"
     }
 }
-
-data class ControlApi(val port: Int, val secret: String)
 
 object ConfigBuilder {
 
@@ -234,15 +229,6 @@ object ConfigBuilder {
                 put("final", if (routing is AppRouting.AndroidPackages || options.routeAllTraffic) PROXY_GROUP_TAG else "direct")
                 put("auto_detect_interface", true)
                 put("default_domain_resolver", "local")
-            }
-
-            if (routing is AppRouting.DesktopProcesses) {
-                putJsonObject("experimental") {
-                    putJsonObject("clash_api") {
-                        put("external_controller", "127.0.0.1:${routing.controlApi.port}")
-                        put("secret", routing.controlApi.secret)
-                    }
-                }
             }
         }
         return json.encodeToString(JsonObject.serializer(), config)

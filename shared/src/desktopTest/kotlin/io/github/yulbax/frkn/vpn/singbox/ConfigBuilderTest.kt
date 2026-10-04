@@ -48,7 +48,7 @@ class ConfigBuilderTest {
             ConfigBuilder.build(
                 proxies, "p1", listOf("discord.exe"), listOf("telegram.exe"), listOf("discord.exe", "telegram.exe"),
                 1081, 2080, "user", "pass",
-                routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"), ControlApi(9090, "secret"))
+                routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"))
             )
         ).jsonObject
 
@@ -64,9 +64,7 @@ class ConfigBuilderTest {
         val tun = config.getValue("inbounds").jsonArray.first().jsonObject
         assertFalse(tun.containsKey("include_package"))
         assertEquals("true", tun.getValue("strict_route").jsonPrimitive.content)
-
-        val clash = config.getValue("experimental").jsonObject.getValue("clash_api").jsonObject
-        assertEquals("127.0.0.1:9090", clash.getValue("external_controller").jsonPrimitive.content)
+        assertFalse(config.containsKey("experimental"))
     }
 
     @Test
@@ -76,7 +74,7 @@ class ConfigBuilderTest {
                 ConfigBuilder.build(
                     proxies, "p1", emptyList(), emptyList(), emptyList(), 1081, 2080, "user", "pass",
                     NetworkOptions(routeAllTraffic = routeAll),
-                    routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"), ControlApi(9090, "secret"))
+                    routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"))
                 )
             ).jsonObject
             val route = config.getValue("route").jsonObject
