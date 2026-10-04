@@ -7,8 +7,8 @@ variables:
   NDK_VERSION: "28.0.13004108"
   CMAKE_VERSION: "3.22.1"
   CMDLINE_TOOLS_VERSION: "11076708"
-  SING_BOX_TAG: "v1.13.16"
-  LIBBOX_CACHE_REV: "5"
+  SING_BOX_TAG: "v1.260910.0"
+  LIBBOX_CACHE_REV: "7"
   GO_VERSION: "1.24.7"
   GOPATH: "${CI_PROJECT_DIR}/.go"
   GOCACHE: "${CI_PROJECT_DIR}/.gocache"
@@ -113,8 +113,8 @@ libbox:
     - wget -q "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -O /tmp/go.tgz
     - rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tgz
     - export PATH="/usr/local/go/bin:${GOPATH}/bin:${PATH}"
-    - go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
-    - go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+    - go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.13
+    - go install github.com/sagernet/gomobile/cmd/gobind@v0.1.13
     - export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
     - bash scripts/build-libbox.sh
   artifacts:

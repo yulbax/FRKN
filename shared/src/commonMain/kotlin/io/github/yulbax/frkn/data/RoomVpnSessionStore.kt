@@ -15,6 +15,8 @@ class RoomVpnSessionStore(
     private val profileRepository: ProfileRepository
 ) : VpnSessionStore {
 
+    override suspend fun refreshProfiles() = profileRepository.refreshDescriptors()
+
     override suspend fun load(): SessionInputs {
         val profileDao = database.profileDao()
         return SessionInputs(

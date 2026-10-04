@@ -6,10 +6,17 @@ import java.util.Date
 object DiagnosticsReport {
     private const val MAX_BOX_LOG_BYTES = 1024 * 1024L
 
-    fun build(environment: List<Pair<String, String>>, appLog: String, boxLog: File): String = buildString {
+    fun build(
+        environment: List<Pair<String, String>>,
+        appLog: String,
+        boxLog: File,
+        profiles: List<String> = emptyList()
+    ): String = buildString {
         append("=== FRKN diagnostics ===\n")
         append("time: ").append(Date()).append('\n')
         environment.forEach { (key, value) -> append(key).append(": ").append(value).append('\n') }
+        append("\n=== profiles ===\n")
+        if (profiles.isEmpty()) append("(none)\n") else profiles.forEach { append(it).append('\n') }
         append("\n=== app log (frkn.log) ===\n")
         append(redactSensitiveData(appLog))
         append("\n=== sing-box (box.log) ===\n")

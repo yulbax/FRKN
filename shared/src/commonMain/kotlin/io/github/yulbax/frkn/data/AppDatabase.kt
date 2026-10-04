@@ -4,7 +4,6 @@ import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
-import androidx.room.TypeConverters
 import androidx.room.immediateTransaction
 import androidx.room.migration.Migration
 import androidx.room.useWriterConnection
@@ -13,7 +12,6 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import io.github.yulbax.frkn.data.profile.ProfileDao
 import io.github.yulbax.frkn.data.profile.ProfileEntity
-import io.github.yulbax.frkn.data.profile.ProxyProtocolConverter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 
@@ -22,7 +20,6 @@ import kotlinx.coroutines.IO
     version = 3,
     exportSchema = true
 )
-@TypeConverters(ProxyProtocolConverter::class)
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
 
@@ -53,6 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun build(builder: Builder<AppDatabase>): AppDatabase =
             builder
                 .addMigrations(*MIGRATIONS)
+                .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                 .setDriver(BundledSQLiteDriver())
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

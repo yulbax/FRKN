@@ -5,7 +5,6 @@ import android.net.VpnService
 import android.os.Process
 import android.os.ParcelFileDescriptor
 import io.github.yulbax.frkn.util.FrknLog
-import io.github.yulbax.frkn.vpn.core.ConnectionOwnerInfo
 import io.github.yulbax.frkn.vpn.core.TunConfig
 import java.net.InetSocketAddress
 
@@ -46,17 +45,18 @@ class TunSession(
         return pfd.fd
     }
 
-    fun findConnectionOwner(
-        ipProtocol: Int,
-        source: InetSocketAddress,
-        destination: InetSocketAddress
-    ): ConnectionOwnerInfo {
+    fun findConnectionOwner(ipProtocol: Int, source: InetSocketAddress, destination: InetSocketAddress): Int {
         val connectivity = service.getSystemService(ConnectivityManager::class.java)
         val uid = connectivity.getConnectionOwnerUid(ipProtocol, source, destination)
         if (uid == Process.INVALID_UID) error("connection owner not found")
-        val packages = service.packageManager.getPackagesForUid(uid)
-        return ConnectionOwnerInfo(uid, packages?.toList() ?: emptyList())
+        return uid
     }
+
+    fun packageNameForUid(uid: Int): String =
+        service.packageManager.getPackagesForUid(uid)?.firstOrNull() ?: error("no package for uid $uid")
+
+    fun uidForPackageName(packageName: String): Int =
+        service.packageManager.getApplicationInfo(packageName, 0).uid
 
     fun close() {
         try {

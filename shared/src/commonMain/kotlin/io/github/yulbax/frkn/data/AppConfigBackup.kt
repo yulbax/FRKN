@@ -83,7 +83,7 @@ fun BackupSettings.toEntity() = SettingsEntity(
 
 fun ProfileEntity.toBackupProfile() = BackupProfile(
     name = name,
-    type = type.wire,
+    type = type,
     link = link,
     outboundJson = outboundJson,
     selected = selected,
@@ -92,7 +92,7 @@ fun ProfileEntity.toBackupProfile() = BackupProfile(
 
 fun BackupProfile.toEntity(parsed: ParsedProfile) = ProfileEntity(
     name = name,
-    type = parsed.protocol,
+    type = parsed.protocol.wire,
     link = link,
     outboundJson = parsed.outboundJson(),
     subscriptionUrl = subscriptionUrl

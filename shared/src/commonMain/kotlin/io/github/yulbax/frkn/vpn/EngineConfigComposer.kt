@@ -17,6 +17,7 @@ data class AppliedConfig(
     val engineConfig: EngineConfig,
     val configName: String,
     val membershipKey: String,
+    val selectedTunnelEndpoint: Boolean,
     val routingKey: String
 ) {
     val selectedTag: String get() = engineConfig.activeProxyTag
@@ -24,7 +25,9 @@ data class AppliedConfig(
     val needsByeDpi: Boolean get() = engineConfig.byeDpiPackages.isNotEmpty()
 
     fun isStructuralChangeFrom(other: AppliedConfig): Boolean =
-        membershipKey != other.membershipKey || routingKey != other.routingKey
+        membershipKey != other.membershipKey ||
+            routingKey != other.routingKey ||
+            selectedTunnelEndpoint != other.selectedTunnelEndpoint
 }
 
 object EngineConfigComposer {
@@ -38,7 +41,9 @@ object EngineConfigComposer {
 
         return AppliedConfig(
             engineConfig = EngineConfig(
-                proxies = profiles.map { EngineProxy(ProxyTag.of(it.id), it.outboundJson) },
+                proxies = profiles.map {
+                    EngineProxy(ProxyTag.of(it.id), it.outboundJson, it.protocol?.tunnelEndpoint == true)
+                },
                 activeProxyTag = ProxyTag.of(selected.id),
                 byeDpiPackages = routed.byeDpiPackages,
                 vpnPackages = routed.vpnPackages,
@@ -48,6 +53,7 @@ object EngineConfigComposer {
             ),
             configName = selected.name.ifBlank { "(unnamed)" },
             membershipKey = profiles.joinToString("|") { "${it.id}:${it.name}:${it.outboundJson}" },
+            selectedTunnelEndpoint = selected.protocol?.tunnelEndpoint == true,
             routingKey = foreignApps.sortedBy { it.packageName }
                 .joinToString("|") { "${it.packageName}=${it.connectionType}" }
         )

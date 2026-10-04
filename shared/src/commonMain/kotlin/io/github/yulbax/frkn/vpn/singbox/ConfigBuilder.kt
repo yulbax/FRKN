@@ -4,6 +4,7 @@ import io.github.yulbax.frkn.vpn.core.EngineProxy
 import io.github.yulbax.frkn.vpn.core.NetworkOptions
 import io.github.yulbax.frkn.vpn.core.TlsFingerprint
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -37,6 +38,8 @@ object ConfigBuilder {
 
     const val PROXY_GROUP_TAG = "proxy"
     private const val PROBE_INBOUND_TAG = "probe-in"
+    private const val REMOTE_DNS_TAG = "remote"
+    private const val IPV4_ONLY = "ipv4_only"
 
     fun build(
         proxies: List<EngineProxy>,
@@ -54,13 +57,17 @@ object ConfigBuilder {
         require(proxies.isNotEmpty()) { "No proxy outbounds" }
         val ipv6Enabled = options.ipv6Mode.ipv6Enabled
 
-        val proxyOutbounds = proxies.map { proxy ->
+        val proxyObjects = proxies.map { proxy ->
             val outbound = JsonObject((Json.parseToJsonElement(proxy.outboundDescriptor) as JsonObject).toMutableMap().apply {
                 put("tag", JsonPrimitive(proxy.tag))
             })
-            applyPreferredFingerprint(outbound, options.preferredFingerprint)
+            proxy to applyPreferredFingerprint(outbound, options.preferredFingerprint)
         }
+        val (proxyEndpoints, proxyOutbounds) = proxyObjects.partition { it.first.tunnelEndpoint }
         val defaultTag = proxies.firstOrNull { it.tag == activeProxyTag }?.tag ?: proxies.first().tag
+        val activeEndpoint = proxyEndpoints.firstOrNull { it.first.tag == defaultTag }?.second
+        val tunnelIsIpv4Only = activeEndpoint?.let { !it.hasIpv6Address() } == true
+        val dnsStrategy = if (tunnelIsIpv4Only) IPV4_ONLY else options.ipv6Mode.dnsStrategy
 
         val config = buildJsonObject {
             putJsonObject("log") {
@@ -72,7 +79,7 @@ object ConfigBuilder {
             putJsonObject("dns") {
                 putJsonArray("servers") {
                     add(buildJsonObject {
-                        put("tag", "remote")
+                        put("tag", REMOTE_DNS_TAG)
                         put("type", "tls")
                         put("server", options.dnsRemote)
                         put("detour", PROXY_GROUP_TAG)
@@ -102,8 +109,8 @@ object ConfigBuilder {
                         })
                     }
                 }
-                put("final", "remote")
-                put("strategy", options.ipv6Mode.dnsStrategy)
+                put("final", REMOTE_DNS_TAG)
+                put("strategy", dnsStrategy)
             }
 
             putJsonArray("inbounds") {
@@ -139,7 +146,7 @@ object ConfigBuilder {
             }
 
             putJsonArray("outbounds") {
-                proxyOutbounds.forEach { add(it) }
+                proxyOutbounds.forEach { add(it.second) }
                 add(buildJsonObject {
                     put("type", "selector")
                     put("tag", PROXY_GROUP_TAG)
@@ -160,6 +167,10 @@ object ConfigBuilder {
                 })
             }
 
+            if (proxyEndpoints.isNotEmpty()) {
+                putJsonArray("endpoints") { proxyEndpoints.forEach { add(it.second) } }
+            }
+
             putJsonObject("route") {
                 putJsonArray("rules") {
                     if (options.sniff) add(buildJsonObject { put("action", "sniff") })
@@ -167,6 +178,13 @@ object ConfigBuilder {
                         put("protocol", "dns")
                         put("action", "hijack-dns")
                     })
+                    if (activeEndpoint != null) {
+                        add(buildJsonObject {
+                            put("action", "resolve")
+                            put("server", REMOTE_DNS_TAG)
+                            put("strategy", dnsStrategy)
+                        })
+                    }
                     add(buildJsonObject {
                         putJsonArray("inbound") { add(PROBE_INBOUND_TAG) }
                         put("action", "route")
@@ -222,6 +240,9 @@ object ConfigBuilder {
         }
         return json.encodeToString(JsonObject.serializer(), config)
     }
+
+    private fun JsonObject.hasIpv6Address(): Boolean =
+        (this["address"] as? JsonArray)?.any { (it as? JsonPrimitive)?.content?.contains(':') == true } == true
 
     private fun applyPreferredFingerprint(outbound: JsonObject, preferred: TlsFingerprint?): JsonObject {
         if (preferred == null) return outbound

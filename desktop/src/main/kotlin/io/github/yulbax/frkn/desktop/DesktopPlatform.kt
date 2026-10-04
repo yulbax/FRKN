@@ -1,5 +1,6 @@
 package io.github.yulbax.frkn.desktop
 
+import io.github.yulbax.frkn.data.profile.ProfileRepository
 import io.github.yulbax.frkn.util.AppLog
 import io.github.yulbax.frkn.util.DiagnosticsReport
 import io.github.yulbax.frkn.util.DiagnosticsSource
@@ -45,16 +46,23 @@ class DesktopVpnLauncher(
     }
 }
 
-class DesktopDiagnostics(private val log: FileAppLog, private val workDir: File) : DiagnosticsSource {
+class DesktopDiagnostics(
+    private val log: FileAppLog,
+    private val workDir: File,
+    private val versionInfo: VersionInfo,
+    private val profiles: ProfileRepository
+) : DiagnosticsSource {
     override suspend fun collect(): String = withContext(Dispatchers.IO) {
         DiagnosticsReport.build(
             environment = listOf(
+                "app" to "${versionInfo.appVersion ?: "unknown"} (core ${versionInfo.coreVersion() ?: "unknown"}, byedpi ${versionInfo.byeDpiVersion})",
                 "os" to "${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})",
                 "java" to System.getProperty("java.version"),
                 "elevated" to WindowsElevation.isElevated().toString()
             ),
             appLog = log.dump(),
-            boxLog = File(workDir, "box.log")
+            boxLog = File(workDir, "box.log"),
+            profiles = profiles.profileDiagnostics()
         )
     }
 }

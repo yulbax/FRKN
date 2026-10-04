@@ -39,14 +39,14 @@ val desktopModule = module {
     single { get<AppDatabase>().profileDao() }
     single { SettingsRepository(get(), get()) }
     single<SubscriptionProfileSource> { HttpSubscriptionProfileSource() }
-    single { ProfileRepository(get(), get(), get()) }
+    single { ProfileRepository(get(), get(), get(), get()) }
     single { ConfigBackupRepository(get(), get()) }
     single<VpnSessionStore> { RoomVpnSessionStore(get(), get()) }
 
     single { VpnStateRepository() }
     single { VpnCommandBus() }
     single<ByeDpiSiteProbe> { SocksSiteProbe }
-    single<DiagnosticsSource> { DesktopDiagnostics(get(), DesktopPaths.workDir) }
+    single<DiagnosticsSource> { DesktopDiagnostics(get(), DesktopPaths.workDir, get(), get()) }
     single<VersionInfo> { DesktopVersionInfo(DesktopPaths.singBox) }
     single<InstalledAppsSource>(createdAtStart = true) {
         ProcessInstalledApps(get(), DesktopPaths.ownExecutable, CoroutineScope(SupervisorJob() + Dispatchers.IO))

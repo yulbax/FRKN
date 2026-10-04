@@ -6,7 +6,6 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
-import io.github.yulbax.frkn.util.ProxyProtocol
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -37,7 +36,7 @@ interface ProfileDao {
     suspend fun updateName(id: Long, name: String)
 
     @Query("UPDATE profiles SET name = :name, type = :type, link = :link, outboundJson = :outboundJson WHERE id = :id")
-    suspend fun updateConfig(id: Long, name: String, type: ProxyProtocol, link: String, outboundJson: String)
+    suspend fun updateConfig(id: Long, name: String, type: String, link: String, outboundJson: String)
 
     @Delete
     suspend fun delete(profile: ProfileEntity)

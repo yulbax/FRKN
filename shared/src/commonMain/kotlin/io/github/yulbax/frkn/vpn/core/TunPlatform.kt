@@ -11,5 +11,9 @@ interface TunPlatform {
         sourcePort: Int,
         destinationAddress: String,
         destinationPort: Int
-    ): ConnectionOwnerInfo
+    ): Int
+
+    fun packageNameForUid(uid: Int): String
+
+    fun uidForPackageName(packageName: String): Int
 }

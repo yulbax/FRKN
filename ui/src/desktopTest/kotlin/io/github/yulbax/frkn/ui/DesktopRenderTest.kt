@@ -86,7 +86,7 @@ class DesktopRenderTest {
                     single { database.profileDao() }
                     single { SettingsRepository(get(), get()) }
                     single<SubscriptionProfileSource> { NoSubscriptions }
-                    single { ProfileRepository(get(), get(), get()) }
+                    single { ProfileRepository(get(), get(), get(), get()) }
                     single { ConfigBackupRepository(get(), get()) }
                     single { VpnStateRepository() }
                     single { VpnCommandBus() }

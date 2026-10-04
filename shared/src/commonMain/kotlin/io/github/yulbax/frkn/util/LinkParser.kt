@@ -13,12 +13,17 @@ import java.net.URLDecoder
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-enum class ProxyProtocol(val wire: String, val schemes: List<String>) {
+enum class ProxyProtocol(
+    val wire: String,
+    val schemes: List<String>,
+    val tunnelEndpoint: Boolean = false
+) {
     VMESS("vmess", listOf("vmess")),
     VLESS("vless", listOf("vless")),
     TROJAN("trojan", listOf("trojan")),
     SHADOWSOCKS("shadowsocks", listOf("ss")),
-    HYSTERIA2("hysteria2", listOf("hysteria2", "hy2"));
+    HYSTERIA2("hysteria2", listOf("hysteria2", "hy2")),
+    AMNEZIAWG("amneziawg", listOf("vpn"), tunnelEndpoint = true);
 
     companion object {
         val allSchemes: List<String> get() = entries.flatMap { it.schemes }
@@ -45,6 +50,9 @@ object LinkParser {
 
     fun parse(rawLink: String): ParsedProfile? {
         val link = rawLink.trim()
+        if (AmneziaWgParser.looksLikeConfig(link)) {
+            return runCatching { AmneziaWgParser.parse(link) }.getOrNull()
+        }
         val protocol = ProxyProtocol.fromLink(link) ?: return null
         return runCatching {
             when (protocol) {
@@ -53,6 +61,7 @@ object LinkParser {
                 ProxyProtocol.TROJAN -> parseTrojan(link)
                 ProxyProtocol.SHADOWSOCKS -> parseShadowsocks(link)
                 ProxyProtocol.HYSTERIA2 -> parseHysteria2(link)
+                ProxyProtocol.AMNEZIAWG -> AmneziaLink.parse(link)
             }
         }.getOrNull()
     }

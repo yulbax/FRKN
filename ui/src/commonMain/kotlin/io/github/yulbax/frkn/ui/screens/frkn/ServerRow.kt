@@ -121,7 +121,7 @@ internal fun ServerRow(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        profile.type.wire,
+                        profile.type,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

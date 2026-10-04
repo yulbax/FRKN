@@ -1,7 +1,6 @@
 package io.github.yulbax.frkn.vpn.singbox
 
 import android.content.Context
-import android.util.Log
 import io.github.yulbax.frkn.vpn.DefaultNetworkMonitor
 import io.github.yulbax.frkn.vpn.core.EngineConfig
 import io.github.yulbax.frkn.vpn.core.EngineListener
@@ -13,18 +12,16 @@ import io.github.yulbax.frkn.vpn.core.VpnEngine
 import io.github.yulbax.frkn.vpn.core.freeLoopbackPort
 import io.github.yulbax.frkn.vpn.core.randomToken
 import io.github.yulbax.frkn.util.FrknLog
+import libbox.BoxService
 import libbox.CommandClient
 import libbox.CommandClientHandler
 import libbox.CommandClientOptions
 import libbox.CommandServer
 import libbox.CommandServerHandler
-import libbox.ConnectionEvents
-import libbox.ConnectionOwner
+import libbox.Connections
 import libbox.InterfaceUpdateListener
 import libbox.Libbox
-import libbox.LogIterator
 import libbox.OutboundGroupIterator
-import libbox.OverrideOptions
 import libbox.SetupOptions
 import libbox.StatusMessage
 import libbox.StringIterator
@@ -45,7 +42,9 @@ class SingBoxEngine(
     override val probePassword: String = randomToken()
 
     private var commandServer: CommandServer? = null
-    private var commandClient: CommandClient? = null
+    private var boxService: BoxService? = null
+    private var statusClient: CommandClient? = null
+    private var groupClient: CommandClient? = null
 
     private val workDir = File(appContext.filesDir, "work")
     private val boxLogFile = File(workDir, "box.log")
@@ -66,11 +65,11 @@ class SingBoxEngine(
         check(commandServer == null) { "sing-box engine is already started" }
         networkMonitor.start()
         runCatching { boxLogFile.takeIf { it.exists() }?.writeText("") }
-        val server = Libbox.newCommandServer(this, this)
+        val server = Libbox.newCommandServer(this, COMMAND_SERVER_LOG_LINES)
         commandServer = server
         try {
             server.start()
-            server.startOrReloadService(buildConfig(config), OverrideOptions())
+            startService(server, config)
             startCommandClient()
         } catch (t: Throwable) {
             stop()
@@ -80,7 +79,17 @@ class SingBoxEngine(
 
     override fun reloadRouting(config: EngineConfig) {
         val server = checkNotNull(commandServer) { "sing-box engine is not started" }
-        server.startOrReloadService(buildConfig(config), OverrideOptions())
+        startService(server, config)
+    }
+
+    private fun startService(server: CommandServer, config: EngineConfig) {
+        val previous = boxService
+        boxService = null
+        runCatching { previous?.close() }
+        val service = Libbox.newService(buildConfig(config), this)
+        service.start()
+        boxService = service
+        server.setService(service)
     }
 
     override fun hasFingerprintError(): Boolean = runCatching {
@@ -94,14 +103,17 @@ class SingBoxEngine(
     }.isSuccess
 
     override fun testProxies() {
-        runCatching { commandClient?.urlTest(ConfigBuilder.PROXY_GROUP_TAG) }
+        runCatching { groupClient?.urlTest(ConfigBuilder.PROXY_GROUP_TAG) }
             .onFailure { log.w(TAG, "urlTest failed", it) }
     }
 
     override fun stop() {
-        runCatching { commandClient?.disconnect() }
-        commandClient = null
-        runCatching { commandServer?.closeService() }
+        runCatching { statusClient?.disconnect() }
+        statusClient = null
+        runCatching { groupClient?.disconnect() }
+        groupClient = null
+        runCatching { boxService?.close() }
+        boxService = null
         runCatching { commandServer?.close() }
         commandServer = null
         runCatching { networkMonitor.stop() }
@@ -149,25 +161,28 @@ class SingBoxEngine(
         override fun disconnected(message: String) {}
         override fun clearLogs() {}
         override fun initializeClashMode(modes: StringIterator, current: String) {}
-        override fun setDefaultLogLevel(level: Int) {}
         override fun updateClashMode(mode: String) {}
-        override fun writeConnectionEvents(events: ConnectionEvents) {}
-        override fun writeLogs(logs: LogIterator) {}
+        override fun writeConnections(connections: Connections) {}
+        override fun writeLogs(logs: StringIterator) {}
     }
 
     private fun startCommandClient() {
+        statusClient = connectClient(Libbox.CommandStatus)
+        groupClient = connectClient(Libbox.CommandGroup)?.also { client ->
+            runCatching { client.setGroupExpand(ConfigBuilder.PROXY_GROUP_TAG, true) }
+        }
+    }
+
+    private fun connectClient(command: Int): CommandClient? {
         val options = CommandClientOptions().apply {
-            statusInterval = 1_000_000_000L
-            addCommand(Libbox.CommandStatus)
-            addCommand(Libbox.CommandGroup)
+            this.command = command
+            statusInterval = STATUS_INTERVAL_NANOS
         }
         val client = Libbox.newCommandClient(clientHandler, options)
-        runCatching { client.connect() }
-            .onSuccess {
-                commandClient = client
-                runCatching { client.setGroupExpand(ConfigBuilder.PROXY_GROUP_TAG, true) }
-            }
-            .onFailure { log.e(TAG, "command client connect failed", it) }
+        return runCatching { client.connect() }
+            .map { client }
+            .onFailure { log.e(TAG, "command client ($command) connect failed", it) }
+            .getOrNull()
     }
 
     override fun openTun(options: TunOptions): Int {
@@ -212,16 +227,13 @@ class SingBoxEngine(
         sourcePort: Int,
         destinationAddress: String,
         destinationPort: Int
-    ): ConnectionOwner {
-        val owner = tunPlatform.findConnectionOwner(
-            ipProtocol, sourceAddress, sourcePort, destinationAddress, destinationPort
-        )
-        return ConnectionOwner().apply {
-            userId = owner.uid
-            userName = owner.packageNames.firstOrNull() ?: ""
-            setAndroidPackageNames(StringArray(owner.packageNames.iterator()))
-        }
-    }
+    ): Int = tunPlatform.findConnectionOwner(
+        ipProtocol, sourceAddress, sourcePort, destinationAddress, destinationPort
+    )
+
+    override fun packageNameByUid(uid: Int): String = tunPlatform.packageNameForUid(uid)
+
+    override fun uidByPackageName(packageName: String): Int = tunPlatform.uidForPackageName(packageName)
 
     override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
         networkMonitor.setListener { name, index ->
@@ -233,18 +245,17 @@ class SingBoxEngine(
         networkMonitor.setListener(null)
     }
 
-    override fun serviceStop() {
+    override fun postServiceClose() {
         listener.onStopRequested()
     }
 
     override fun serviceReload() {}
     override fun getSystemProxyStatus(): SystemProxyStatus = SystemProxyStatus()
     override fun setSystemProxyEnabled(enabled: Boolean) {}
-    override fun writeDebugMessage(message: String) {
-        Log.d(TAG, message)
-    }
 
     private companion object {
         const val TAG = "SingBoxEngine"
+        const val COMMAND_SERVER_LOG_LINES = 300
+        const val STATUS_INTERVAL_NANOS = 1_000_000_000L
     }
 }

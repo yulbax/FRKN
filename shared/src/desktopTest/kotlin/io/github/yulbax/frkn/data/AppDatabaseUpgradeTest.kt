@@ -50,7 +50,8 @@ class AppDatabaseUpgradeTest {
     private suspend fun assertSeededRows(database: AppDatabase) {
         assertEquals(ConnectionType.BYEDPI, database.appDao().getApp("com.example.app")?.connectionType)
         val profile: ProfileEntity = database.profileDao().observeSelected().first()!!
-        assertEquals(ProxyProtocol.VLESS, profile.type)
+        assertEquals(ProxyProtocol.VLESS.wire, profile.type)
+        assertEquals(ProxyProtocol.VLESS, profile.protocol)
         assertEquals("Example", profile.name)
     }
 

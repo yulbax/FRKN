@@ -12,5 +12,6 @@ data class EngineConfig(
 
 data class EngineProxy(
     val tag: String,
-    val outboundDescriptor: String
+    val outboundDescriptor: String,
+    val tunnelEndpoint: Boolean = false
 )

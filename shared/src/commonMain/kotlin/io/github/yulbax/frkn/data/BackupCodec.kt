@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.URI
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -100,16 +101,23 @@ object BackupCodec {
         val outbound = runCatching { json.parseToJsonElement(profile.outboundJson) as? JsonObject }
             .getOrNull() ?: return false
         val type = runCatching { outbound["type"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-        val server = runCatching { outbound["server"]?.jsonPrimitive?.contentOrNull }.getOrNull()
-        val port = runCatching { outbound["server_port"]?.jsonPrimitive?.intOrNull }.getOrNull()
-        val parsedServer = parsed.outbound["server"]?.jsonPrimitive?.contentOrNull
-        val parsedPort = parsed.outbound["server_port"]?.jsonPrimitive?.intOrNull
-        return type == profile.type &&
+        val (server, port) = outbound.endpoint()
+        val (parsedServer, parsedPort) = parsed.outbound.endpoint()
+        return type == parsed.outbound["type"]?.jsonPrimitive?.contentOrNull &&
             server == parsedServer &&
             port == parsedPort &&
             !server.isNullOrBlank() &&
             port != null &&
             port in 1..65535
+    }
+
+    private fun JsonObject.endpoint(): Pair<String?, Int?> {
+        val peer = (this["peers"] as? JsonArray)?.firstOrNull() as? JsonObject
+        val source = peer ?: this
+        val serverKey = if (peer != null) "address" else "server"
+        val portKey = if (peer != null) "port" else "server_port"
+        return runCatching { source[serverKey]?.jsonPrimitive?.contentOrNull }.getOrNull() to
+            runCatching { source[portKey]?.jsonPrimitive?.intOrNull }.getOrNull()
     }
 
     private fun isValidSubscriptionUrl(value: String): Boolean {

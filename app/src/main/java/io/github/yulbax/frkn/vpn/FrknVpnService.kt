@@ -8,7 +8,6 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import io.github.yulbax.frkn.BuildConfig
 import io.github.yulbax.frkn.util.FrknLog
-import io.github.yulbax.frkn.vpn.core.ConnectionOwnerInfo
 import io.github.yulbax.frkn.vpn.core.TunConfig
 import io.github.yulbax.frkn.vpn.core.TunPlatform
 import io.github.yulbax.frkn.vpn.singbox.SingBoxEngine
@@ -113,11 +112,15 @@ class FrknVpnService :
         sourcePort: Int,
         destinationAddress: String,
         destinationPort: Int
-    ): ConnectionOwnerInfo = tunSession.findConnectionOwner(
+    ): Int = tunSession.findConnectionOwner(
         ipProtocol,
         InetSocketAddress(sourceAddress, sourcePort),
         InetSocketAddress(destinationAddress, destinationPort)
     )
+
+    override fun packageNameForUid(uid: Int): String = tunSession.packageNameForUid(uid)
+
+    override fun uidForPackageName(packageName: String): Int = tunSession.uidForPackageName(packageName)
 
     override fun onRevoke() {
         controller.stop(token = null, force = true)

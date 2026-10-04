@@ -9,6 +9,7 @@ import io.github.yulbax.frkn.data.RoomVpnSessionStore
 import io.github.yulbax.frkn.data.SettingsDao
 import io.github.yulbax.frkn.data.SettingsRepository
 import io.github.yulbax.frkn.data.profile.ProfileDao
+import io.github.yulbax.frkn.util.AppLog
 import io.github.yulbax.frkn.data.profile.ProfileRepository
 import io.github.yulbax.frkn.data.profile.SubscriptionProfileSource
 import io.github.yulbax.frkn.data.profile.HttpSubscriptionProfileSource
@@ -49,8 +50,9 @@ class AppModule {
     fun profileRepository(
         database: AppDatabase,
         profileDao: ProfileDao,
-        subscriptionSource: SubscriptionProfileSource
-    ): ProfileRepository = ProfileRepository(database, profileDao, subscriptionSource)
+        subscriptionSource: SubscriptionProfileSource,
+        log: AppLog
+    ): ProfileRepository = ProfileRepository(database, profileDao, subscriptionSource, log)
 
     @Single
     fun vpnSessionStore(database: AppDatabase, profileRepository: ProfileRepository): VpnSessionStore =

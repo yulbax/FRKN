@@ -1,6 +1,7 @@
 package io.github.yulbax.frkn.data.profile
 
 import io.github.yulbax.frkn.data.AppDatabase
+import io.github.yulbax.frkn.util.AppLog
 import io.github.yulbax.frkn.util.LinkParser
 import io.github.yulbax.frkn.util.ParsedProfile
 import kotlinx.coroutines.CancellationException
@@ -13,7 +14,8 @@ interface SubscriptionProfileSource {
 class ProfileRepository(
     private val database: AppDatabase,
     private val profileDao: ProfileDao,
-    private val subscriptionSource: SubscriptionProfileSource
+    private val subscriptionSource: SubscriptionProfileSource,
+    private val log: AppLog
 ) {
     val profiles: Flow<List<ProfileEntity>> = profileDao.observeAll()
     val selected: Flow<ProfileEntity?> = profileDao.observeSelected()
@@ -39,7 +41,7 @@ class ProfileRepository(
             profileDao.updateConfig(
                 id = profile.id,
                 name = name.trim().ifBlank { parsed.name },
-                type = parsed.protocol,
+                type = parsed.protocol.wire,
                 link = trimmedLink,
                 outboundJson = parsed.outboundJson()
             )
@@ -60,7 +62,7 @@ class ProfileRepository(
         profileDao.updateConfig(
             id = profile.id,
             name = profile.name,
-            type = fresh.protocol,
+            type = fresh.protocol.wire,
             link = fresh.link,
             outboundJson = fresh.outboundJson()
         )
@@ -75,6 +77,47 @@ class ProfileRepository(
         database.transaction {
             profileDao.delete(profile)
             ensureSelection()
+        }
+    }
+
+    suspend fun refreshDescriptors() {
+        val rebuilt = mutableListOf<Long>()
+        val unparseable = mutableListOf<Long>()
+        database.transaction {
+            profileDao.getAll().forEach { profile ->
+                val parsed = LinkParser.parse(profile.link)
+                if (parsed == null) {
+                    unparseable += profile.id
+                    return@forEach
+                }
+                val outboundJson = parsed.outboundJson()
+                if (outboundJson == profile.outboundJson && parsed.protocol.wire == profile.type) return@forEach
+                profileDao.updateConfig(
+                    id = profile.id,
+                    name = profile.name,
+                    type = parsed.protocol.wire,
+                    link = profile.link,
+                    outboundJson = outboundJson
+                )
+                rebuilt += profile.id
+            }
+        }
+        if (rebuilt.isNotEmpty()) log.i(TAG, "descriptors rebuilt for profiles $rebuilt")
+        if (unparseable.isNotEmpty()) {
+            log.w(TAG, "profiles $unparseable keep a stale descriptor: their link no longer parses")
+        }
+    }
+
+    suspend fun profileDiagnostics(): List<String> = profileDao.getAll().map { profile ->
+        val parsed = LinkParser.parse(profile.link)
+        buildString {
+            append("id=").append(profile.id)
+            append(" type=").append(profile.type)
+            if (profile.protocol == null) append(" (unknown to this build)")
+            append(" parses=").append(parsed != null)
+            if (parsed != null) append(" fresh=").append(parsed.outboundJson() == profile.outboundJson)
+            append(" selected=").append(profile.selected)
+            append(" subscription=").append(profile.subscriptionUrl.isNotEmpty())
         }
     }
 
@@ -114,11 +157,15 @@ class ProfileRepository(
 
     private fun ParsedProfile.toEntity(subscriptionUrl: String = "") = ProfileEntity(
         name = name,
-        type = protocol,
+        type = protocol.wire,
         link = link,
         outboundJson = outboundJson(),
         subscriptionUrl = subscriptionUrl
     )
+
+    private companion object {
+        const val TAG = "ProfileRepository"
+    }
 
     private fun String.isHttpUrl(): Boolean =
         startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)

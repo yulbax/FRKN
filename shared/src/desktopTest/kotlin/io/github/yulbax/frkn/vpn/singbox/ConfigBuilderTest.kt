@@ -68,9 +68,95 @@ class ConfigBuilderTest {
         assertEquals("127.0.0.1:9090", clash.getValue("external_controller").jsonPrimitive.content)
     }
 
+    @Test
+    fun amneziaWgProfileIsEmittedAsEndpoint() {
+        val awg = requireNotNull(io.github.yulbax.frkn.util.LinkParser.parse(AWG_CONFIG))
+        val config = Json.parseToJsonElement(
+            ConfigBuilder.build(
+                proxies = proxies + EngineProxy("p3", awg.outboundJson(), tunnelEndpoint = true),
+                activeProxyTag = "p3",
+                byeDpiPackages = emptyList(),
+                vpnPackages = listOf("org.telegram"),
+                tunneledPackages = listOf("org.telegram"),
+                byeDpiPort = 1081,
+                probePort = 2080,
+                probeUser = "user",
+                probePass = "pass"
+            )
+        ).jsonObject
+
+        val endpoint = config.getValue("endpoints").jsonArray.single().jsonObject
+        assertEquals("awg", endpoint.getValue("type").jsonPrimitive.content)
+        assertEquals("p3", endpoint.getValue("tag").jsonPrimitive.content)
+
+        val outbounds = config.getValue("outbounds").jsonArray.map { it.jsonObject }
+        assertTrue(outbounds.none { it["type"]?.jsonPrimitive?.content == "awg" })
+
+        val selector = outbounds.single { it["tag"]?.jsonPrimitive?.content == ConfigBuilder.PROXY_GROUP_TAG }
+        assertEquals(
+            listOf("p1", "p2", "p3"),
+            selector.getValue("outbounds").jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals("p3", selector.getValue("default").jsonPrimitive.content)
+
+        assertEquals("ipv4_only", config.getValue("dns").jsonObject.getValue("strategy").jsonPrimitive.content)
+
+        val rules = config.getValue("route").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
+        val resolve = rules.single { it["action"]?.jsonPrimitive?.content == "resolve" }
+        assertEquals("remote", resolve.getValue("server").jsonPrimitive.content)
+        assertEquals("ipv4_only", resolve.getValue("strategy").jsonPrimitive.content)
+        assertTrue(
+            rules.indexOf(resolve) <
+                rules.indexOfFirst { it["inbound"] != null }
+        )
+    }
+
+    @Test
+    fun keepsDomainsUnresolvedForRegularProxies() {
+        val config = Json.parseToJsonElement(
+            ConfigBuilder.build(
+                proxies = proxies,
+                activeProxyTag = "p1",
+                byeDpiPackages = emptyList(),
+                vpnPackages = listOf("org.telegram"),
+                tunneledPackages = listOf("org.telegram"),
+                byeDpiPort = 1081,
+                probePort = 2080,
+                probeUser = "user",
+                probePass = "pass"
+            )
+        ).jsonObject
+
+        val rules = config.getValue("route").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
+        assertTrue(rules.none { it["action"]?.jsonPrimitive?.content == "resolve" })
+    }
+
     private fun List<JsonObject>.processRule(outbound: String): List<String>? =
         firstOrNull { it["outbound"]?.jsonPrimitive?.content == outbound && it.containsKey("process_name") }
             ?.let { rule -> (rule.getValue("process_name") as JsonArray).map { it.jsonPrimitive.content } }
+
+    private companion object {
+        val AWG_CONFIG = """
+            [Interface]
+            Address = 10.8.1.2/32
+            PrivateKey = aPrivateKey=
+            Jc = 4
+            Jmin = 50
+            Jmax = 1000
+            S1 = 15
+            S2 = 36
+            H1 = 1148364954
+            H2 = 1813799810
+            H3 = 1082378570
+            H4 = 1151590459
+
+            [Peer]
+            PublicKey = aPublicKey=
+            AllowedIPs = 0.0.0.0/0
+            Endpoint = vpn.example.com:51820
+            PersistentKeepalive = 25
+        """.trimIndent()
+    }
 
     private fun golden(name: String): String =
         requireNotNull(javaClass.getResource("/golden/$name")).readText()

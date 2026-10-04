@@ -24,18 +24,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-SING_BOX_TAG="${SING_BOX_TAG:-v1.13.16}"
-SING_BOX_REPO="${SING_BOX_REPO:-https://github.com/SagerNet/sing-box.git}"
+SING_BOX_TAG="${SING_BOX_TAG:-v1.260910.0}"
+SING_BOX_REPO="${SING_BOX_REPO:-https://github.com/amnezia-vpn/amnezia-box.git}"
 WORK_DIR="${LIBBOX_WORK_DIR:-${REPO_ROOT}/.libbox-build}"
 SRC="${WORK_DIR}/sing-box"
 OUT_AAR="${REPO_ROOT}/app/libs/libbox.aar"
 
 # FULL upstream Android libbox feature set (cmd/internal/build_libbox sharedTags)
-# minus only with_tailscale. Every protocol sing-box ships on Android is compiled
-# in — adding a new one is a Kotlin-side LinkParser change, not a core rebuild.
-# Do NOT trim these; keep the core fully featured. Tailscale is dropped via the
-# native_shell_session.go stub below (an import strip, not a tag).
-TAGS="with_gvisor,with_quic,with_wireguard,with_utls,with_naive_outbound,with_clash_api,badlinkname,tfogo_checklinkname0"
+# minus only with_tailscale, plus with_awg (AmneziaWG, only known to the Amnezia
+# fork; harmless on upstream, where no file is gated on it). Do NOT trim these; keep
+# the core fully featured. Tailscale is dropped via the native_shell_session.go stub
+# below (an import strip, not a tag).
+TAGS="with_gvisor,with_quic,with_wireguard,with_utls,with_naive_outbound,with_clash_api,with_awg,badlinkname,tfogo_checklinkname0"
 LDFLAGS="-X github.com/sagernet/sing-box/constant.Version=${SING_BOX_TAG} -s -w -buildid= -checklinkname=0"
 
 say() { printf '\033[1;36m>>> %s\033[0m\n' "$*"; }
@@ -51,8 +51,8 @@ if [ "${FORCE_REBUILD:-0}" != "1" ] && [ -f "$OUT_AAR" ]; then
 fi
 
 command -v go        >/dev/null || die "go not in PATH"
-command -v gomobile  >/dev/null || die "gomobile not in PATH (go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12)"
-command -v gobind    >/dev/null || die "gobind not in PATH (go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12)"
+command -v gomobile  >/dev/null || die "gomobile not in PATH (go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.13)"
+command -v gobind    >/dev/null || die "gobind not in PATH (go install github.com/sagernet/gomobile/cmd/gobind@v0.1.13)"
 [ -n "${ANDROID_NDK_HOME:-}" ] && [ -d "$ANDROID_NDK_HOME" ] || die "ANDROID_NDK_HOME unset or missing"
 
 # ── 1. Fetch sing-box at the pinned tag. ────────────────────────────────────────
@@ -61,11 +61,22 @@ if [ ! -d "$SRC/.git" ]; then
   git clone --depth 1 --branch "$SING_BOX_TAG" "$SING_BOX_REPO" "$SRC"
 else
   say "Reusing checkout; fetching $SING_BOX_TAG"
+  git -C "$SRC" remote set-url origin "$SING_BOX_REPO"
   git -C "$SRC" fetch --tags --depth 1 --quiet origin "$SING_BOX_TAG"
   git -C "$SRC" checkout -f --quiet "FETCH_HEAD"
 fi
 cd "$SRC"
 say "HEAD: $(git describe --tags 2>/dev/null || git rev-parse --short HEAD)"
+
+# ── 1b. Forks replace dependencies (wireguard-go for AmneziaWG, sing-tun, gvisor,
+# utls) with submodules; the clients/* submodules are IDE projects we never build.
+if [ -f .gitmodules ]; then
+  SUBMODULES="$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}' | grep '^submodules/' || true)"
+  if [ -n "$SUBMODULES" ]; then
+    say "Fetching dependency submodules: $(echo "$SUBMODULES" | tr '\n' ' ')"
+    git submodule update --init --depth 1 $SUBMODULES
+  fi
+fi
 
 # ── 2. Re-apply the Tailscale-strip stub (only where it's needed). ──────────────
 # Newer sing-box (≈v1.14+) ships experimental/libbox/native_shell_session.go which

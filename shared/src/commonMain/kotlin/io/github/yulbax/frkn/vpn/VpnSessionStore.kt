@@ -14,6 +14,8 @@ data class SessionInputs(
 )
 
 interface VpnSessionStore {
+    suspend fun refreshProfiles()
+
     suspend fun load(): SessionInputs
 
     fun routingChanges(): Flow<Unit>

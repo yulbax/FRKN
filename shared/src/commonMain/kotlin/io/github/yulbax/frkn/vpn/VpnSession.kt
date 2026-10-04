@@ -62,6 +62,7 @@ class VpnSession(
         log.i(TAG, "start requested system=$systemInitiated")
         stateRepository.update(VpnState.Connecting)
         appliedConfig = null
+        store.refreshProfiles()
         val inputs = store.load()
         byeDpiArgs = ByeDpiArgs.parse(inputs.settings.byeDpiArgs)
         byeDpiPort = freeLoopbackPort()

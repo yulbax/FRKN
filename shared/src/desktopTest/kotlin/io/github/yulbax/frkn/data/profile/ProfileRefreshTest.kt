@@ -1,0 +1,134 @@
+package io.github.yulbax.frkn.data.profile
+
+import androidx.room.Room
+import io.github.yulbax.frkn.data.AppDatabase
+import io.github.yulbax.frkn.util.AppLog
+import io.github.yulbax.frkn.util.ParsedProfile
+import io.github.yulbax.frkn.util.ProxyProtocol
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+class ProfileRefreshTest {
+    private lateinit var database: AppDatabase
+    private lateinit var repository: ProfileRepository
+    private val log = RecordingLog()
+
+    @Before
+    fun setUp() {
+        database = AppDatabase.build(Room.inMemoryDatabaseBuilder<AppDatabase>())
+        repository = ProfileRepository(database, database.profileDao(), NoSubscriptions, log)
+    }
+
+    @After
+    fun tearDown() {
+        database.close()
+    }
+
+    @Test
+    fun rebuildsDescriptorsStoredBeforeASchemaChange() = runBlocking {
+        database.profileDao().insert(
+            ProfileEntity(
+                name = "Amnezia",
+                type = ProxyProtocol.AMNEZIAWG.wire,
+                link = AWG_CONFIG,
+                outboundJson = STALE_DESCRIPTOR
+            )
+        )
+
+        repository.refreshDescriptors()
+
+        val stored = database.profileDao().getAll().single()
+        val endpoint = kotlinx.serialization.json.Json.parseToJsonElement(stored.outboundJson).jsonObject
+        assertEquals("awg", endpoint.getValue("type").jsonPrimitive.content)
+        val peer = endpoint.getValue("peers").jsonArray.single().jsonObject
+        assertEquals(25, peer.getValue("persistent_keepalive_interval").jsonPrimitive.content.toInt())
+        assertEquals("aPresharedKey=", peer.getValue("preshared_key").jsonPrimitive.content)
+    }
+
+    @Test
+    fun keepsUpToDateDescriptorsUntouched() = runBlocking {
+        repository.add(AWG_CONFIG)
+        val before = database.profileDao().getAll().single()
+
+        repository.refreshDescriptors()
+
+        assertEquals(before, database.profileDao().getAll().single())
+    }
+
+    @Test
+    fun keepsProfilesReadableWhenTheStoredTypeIsUnknownToThisBuild() = runBlocking {
+        database.profileDao().insert(
+            ProfileEntity(
+                name = "From a newer build",
+                type = "quantumwg",
+                link = "quantumwg://whatever",
+                outboundJson = STALE_DESCRIPTOR
+            )
+        )
+
+        val stored = database.profileDao().getAll().single()
+        assertEquals("quantumwg", stored.type)
+        assertNull(stored.protocol)
+
+        repository.refreshDescriptors()
+
+        assertEquals(stored, database.profileDao().getAll().single())
+        assertTrue(log.warnings.single().contains("keep a stale descriptor"))
+        assertTrue(repository.profileDiagnostics().single().contains("unknown to this build"))
+    }
+
+    @Test
+    fun diagnosticsReportStaleAndFreshDescriptorsWithoutLeakingSecrets() = runBlocking {
+        repository.add(AWG_CONFIG)
+        database.profileDao().insert(
+            ProfileEntity(name = "Stale", type = ProxyProtocol.AMNEZIAWG.wire, link = AWG_CONFIG, outboundJson = STALE_DESCRIPTOR)
+        )
+
+        val report = repository.profileDiagnostics()
+
+        assertTrue(report.any { it.contains("fresh=true") })
+        assertTrue(report.any { it.contains("fresh=false") })
+        assertTrue(report.none { it.contains("aPrivateKey") || it.contains("vpn.example.com") })
+    }
+
+    private class RecordingLog : AppLog {
+        val warnings = mutableListOf<String>()
+        override fun i(tag: String, message: String) = Unit
+        override fun w(tag: String, message: String, t: Throwable?) {
+            warnings += message
+        }
+        override fun e(tag: String, message: String, t: Throwable?) = Unit
+    }
+
+    private object NoSubscriptions : SubscriptionProfileSource {
+        override suspend fun fetch(url: String): List<ParsedProfile> = emptyList()
+    }
+
+    private companion object {
+        const val STALE_DESCRIPTOR = """{"type":"wireguard","address":["10.8.1.2/32"],"private_key":"aPrivateKey=",""" +
+            """"peers":[{"address":"vpn.example.com","port":51820,"public_key":"aPublicKey=",""" +
+            """"pre_shared_key":"aPresharedKey=","allowed_ips":["0.0.0.0/0"],"persistent_keepalive_interval":"25-35"}]}"""
+
+        val AWG_CONFIG = """
+            [Interface]
+            Address = 10.8.1.2/32
+            PrivateKey = aPrivateKey=
+            Jc = 4
+
+            [Peer]
+            PublicKey = aPublicKey=
+            PresharedKey = aPresharedKey=
+            AllowedIPs = 0.0.0.0/0
+            Endpoint = vpn.example.com:51820
+            PersistentKeepalive = 25-35
+        """.trimIndent()
+    }
+}

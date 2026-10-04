@@ -1,6 +1,5 @@
 package io.github.yulbax.frkn.vpn.singbox
 
-import libbox.ConnectionOwner
 import libbox.InterfaceUpdateListener
 import libbox.LocalDNSTransport
 import libbox.NetworkInterfaceIterator
@@ -29,7 +28,11 @@ interface FrknPlatformInterface : PlatformInterface {
         sourcePort: Int,
         destinationAddress: String,
         destinationPort: Int
-    ): ConnectionOwner = error("findConnectionOwner not implemented")
+    ): Int = error("findConnectionOwner not implemented")
+
+    override fun packageNameByUid(uid: Int): String = error("packageNameByUid not implemented")
+
+    override fun uidByPackageName(packageName: String): Int = error("uidByPackageName not implemented")
 
     override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {}
 
@@ -47,6 +50,8 @@ interface FrknPlatformInterface : PlatformInterface {
 
     override fun clearDNSCache() {}
 
+    override fun writeLog(message: String) {}
+
     @OptIn(ExperimentalEncodingApi::class)
     override fun systemCertificates(): StringIterator {
         val certificates = mutableListOf<String>()
@@ -58,8 +63,8 @@ interface FrknPlatformInterface : PlatformInterface {
                 val cert = keyStore.getCertificate(aliases.nextElement())
                 certificates.add(
                     "-----BEGIN CERTIFICATE-----\n" +
-                    Base64.encode(cert.encoded) +
-                    "\n-----END CERTIFICATE-----"
+                        Base64.encode(cert.encoded) +
+                        "\n-----END CERTIFICATE-----"
                 )
             }
         }

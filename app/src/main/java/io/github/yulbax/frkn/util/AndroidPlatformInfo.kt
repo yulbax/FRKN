@@ -1,6 +1,7 @@
 package io.github.yulbax.frkn.util
 
 import android.content.Context
+import io.github.yulbax.frkn.data.profile.ProfileRepository
 import io.github.yulbax.frkn.engine.BYEDPI_VERSION
 import io.github.yulbax.frkn.vpn.FrknVpnService
 import kotlinx.coroutines.Dispatchers
@@ -16,9 +17,11 @@ class AndroidVpnLauncher(private val context: Context) : VpnLauncher {
 @Single(binds = [DiagnosticsSource::class])
 class AndroidDiagnosticsSource(
     private val context: Context,
-    private val frknLog: FrknLog
+    private val frknLog: FrknLog,
+    private val versionInfo: VersionInfo,
+    private val profiles: ProfileRepository
 ) : DiagnosticsSource {
-    override suspend fun collect(): String = Diagnostics.collect(context, frknLog)
+    override suspend fun collect(): String = Diagnostics.collect(context, frknLog, versionInfo, profiles)
 }
 
 @Single(binds = [VersionInfo::class])
