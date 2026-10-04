@@ -64,6 +64,7 @@ class ConfigBuilderTest {
         val tun = config.getValue("inbounds").jsonArray.first().jsonObject
         assertFalse(tun.containsKey("include_package"))
         assertEquals("true", tun.getValue("strict_route").jsonPrimitive.content)
+        assertEquals(ConfigBuilder.DESKTOP_INTERFACE_NAME, tun.getValue("interface_name").jsonPrimitive.content)
         assertFalse(config.containsKey("experimental"))
     }
 

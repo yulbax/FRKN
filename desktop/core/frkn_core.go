@@ -24,6 +24,7 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	"github.com/sagernet/sing-box/protocol/group"
+	E "github.com/sagernet/sing/common/exceptions"
 	"github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
 )
@@ -57,12 +58,18 @@ func parse(ctx context.Context, content string) (option.Options, error) {
 	return options, nil
 }
 
-func create(content string) (*instance, error) {
+func create(content string, prepare func(option.Options) error) (*instance, error) {
 	ctx, cancel := context.WithCancel(baseContext())
 	options, err := parse(ctx, content)
 	if err != nil {
 		cancel()
 		return nil, err
+	}
+	if prepare != nil {
+		if err = prepare(options); err != nil {
+			cancel()
+			return nil, err
+		}
 	}
 	created, err := box.New(box.Options{Context: ctx, Options: options})
 	if err != nil {
@@ -84,6 +91,19 @@ func (i *instance) close() error {
 	}
 }
 
+func removeStaleAdapters(options option.Options) error {
+	for _, inbound := range options.Inbounds {
+		tun, isTun := inbound.Options.(*option.TunInboundOptions)
+		if !isTun || tun.InterfaceName == "" {
+			continue
+		}
+		if _, err := removeStaleAdapter(tun.InterfaceName); err != nil {
+			return E.Cause(err, "remove stale adapter ", tun.InterfaceName)
+		}
+	}
+	return nil
+}
+
 func result(err error) *C.char {
 	if err == nil {
 		return nil
@@ -103,7 +123,7 @@ func frkn_version() *C.char {
 
 //export frkn_check
 func frkn_check(config *C.char) *C.char {
-	checked, err := create(C.GoString(config))
+	checked, err := create(C.GoString(config), nil)
 	if err != nil {
 		return result(err)
 	}
@@ -121,7 +141,7 @@ func frkn_start(config *C.char, workDir *C.char) *C.char {
 	if err := os.Chdir(C.GoString(workDir)); err != nil {
 		return result(err)
 	}
-	started, err := create(C.GoString(config))
+	started, err := create(C.GoString(config), removeStaleAdapters)
 	if err != nil {
 		return result(err)
 	}

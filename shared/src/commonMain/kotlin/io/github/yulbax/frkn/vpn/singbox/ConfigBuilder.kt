@@ -33,6 +33,7 @@ object ConfigBuilder {
     private const val TUN_INET4 = "172.18.0.1/30"
 
     const val PROXY_GROUP_TAG = "proxy"
+    const val DESKTOP_INTERFACE_NAME = "FRKN"
     private const val PROBE_INBOUND_TAG = "probe-in"
     private const val REMOTE_DNS_TAG = "remote"
     private const val IPV4_ONLY = "ipv4_only"
@@ -126,7 +127,10 @@ object ConfigBuilder {
                     put("mtu", options.mtu)
                     put("auto_route", true)
                     put("stack", options.tunStack.wire)
-                    if (routing is AppRouting.DesktopProcesses) put("strict_route", true)
+                    if (routing is AppRouting.DesktopProcesses) {
+                        put("interface_name", DESKTOP_INTERFACE_NAME)
+                        put("strict_route", true)
+                    }
                     if (routing is AppRouting.AndroidPackages && tunneledPackages.isNotEmpty()) {
                         putJsonArray("include_package") {
                             tunneledPackages.forEach { add(it) }
