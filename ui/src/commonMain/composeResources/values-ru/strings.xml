@@ -136,4 +136,7 @@
     <string name="error_process_lookup">Маршрутизация по приложениям недоступна: не загружены модули ядра inet_diag, tcp_diag и udp_diag. Обычно так бывает после обновления ядра — перезагрузите компьютер.</string>
     <string name="channel_status_byedpi_blocked">сайты не открываются — смените стратегию</string>
     <string name="new_apps_channel">Канал для новых приложений</string>
+    <string name="logs_clear">Очистить</string>
+    <string name="logs_clear_title">Очистить журнал?</string>
+    <string name="logs_clear_message">Записи приложения и ядра будут удалены.</string>
 </resources>

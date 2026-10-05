@@ -4,8 +4,10 @@ fun interface VpnLauncher {
     fun start()
 }
 
-fun interface DiagnosticsSource {
+interface DiagnosticsSource {
     suspend fun collect(): String
+
+    suspend fun clear()
 }
 
 interface VersionInfo {

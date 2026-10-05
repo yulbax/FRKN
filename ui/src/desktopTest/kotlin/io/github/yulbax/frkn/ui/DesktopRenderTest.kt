@@ -93,7 +93,12 @@ class DesktopRenderTest {
                     single<VpnLauncher> { VpnLauncher { } }
                     single<ByeDpiSiteProbe> { NoSiteProbe }
                     single<AppLog> { SilentLog }
-                    single<DiagnosticsSource> { DiagnosticsSource { "=== FRKN diagnostics ===" } }
+                    single<DiagnosticsSource> {
+                        object : DiagnosticsSource {
+                            override suspend fun collect() = "=== FRKN diagnostics ===\n" + "line\n".repeat(400)
+                            override suspend fun clear() = Unit
+                        }
+                    }
                     single<VersionInfo> { FakeVersionInfo }
                     single<InstalledAppsSource> { FakeInstalledApps(installedApps) }
                 },

@@ -36,6 +36,12 @@ class DesktopService(
         return hello
     }
 
+    @Synchronized
+    fun clearCoreLog() {
+        if (peek() == null) return
+        runCatching { client?.clearLog() }.onFailure { log.w(TAG, "could not clear the core log", it) }
+    }
+
     private fun tryConnect(): ServiceClient? = runCatching {
         ServiceClient.connect(socket).also { hello = it.hello() }
     }.getOrNull()

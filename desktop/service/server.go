@@ -143,6 +143,12 @@ func (s *server) dispatch(conn net.Conn, message request) response {
 	case "stop":
 		s.claim(nil)
 		return fail(s.engine.stop())
+	case "clearLog":
+		err := os.Truncate(filepath.Join(s.workDir, "box.log"), 0)
+		if errors.Is(err, os.ErrNotExist) {
+			err = nil
+		}
+		return fail(err)
 	case "select":
 		result.OK = s.engine.selectOutbound(message.Group, message.Outbound)
 	case "delay":

@@ -17,17 +17,12 @@ DPI-bypass engine, or straight out untouched. All three can run at the same time
 Get the latest APKs, the Windows installer and the Linux packages from
 [Releases](https://github.com/yulbax/FRKN/releases/latest).
 
-- **Android** — `FRKN-<version>-arm64-v8a.apk` fits almost every modern phone;
-  `universal` works everywhere. Android 10 or newer.
-- **Windows** — `FRKN-<version>.msi`, Windows 10/11 x64. To update, close FRKN and
-  install the newer MSI over the old one; settings and servers are kept.
-  The tunnel runs in the FRKN background service, which the installer sets up, so the app
-  itself never asks for administrator rights.
-- **Linux** — `FRKN-<version>-amd64.deb` (Debian, Ubuntu), `FRKN-<version>-x86_64.rpm`
-  (Fedora, openSUSE) or `FRKN-<version>-x86_64.pkg.tar.zst` (Arch), x86_64. The package
-  installs and enables the `frkn.service` systemd unit, so the app runs as a normal user. The window uses X11, so on
-  Wayland it runs through XWayland. Minimize-to-tray needs a StatusNotifierItem tray
-  (KDE, waybar, GNOME with the AppIndicator extension).
+- **Android** — `FRKN-<version>-android-arm64-v8a.apk` fits almost every phone; `universal`
+  works everywhere. Android 10 or newer.
+- **Windows** — `FRKN-<version>-windows-x86_64.msi`, Windows 10/11. To update, install the newer
+  MSI over the old one; your servers and settings are kept.
+- **Linux** — `FRKN-<version>-linux-x86_64.deb` (Debian, Ubuntu), `.rpm` (Fedora, openSUSE) or
+  `.pkg.tar.zst` (Arch).
 
 ## Features
 
@@ -109,7 +104,7 @@ One script builds the service, the app and the `.deb`, `.rpm` and Arch packages 
 
 ```bash
 bash scripts/build-linux-packages.sh          # FORMATS="archlinux" for just one
-sudo pacman -U desktop/build/linux-packages/FRKN-<version>-x86_64.pkg.tar.zst
+sudo pacman -U desktop/build/linux-packages/FRKN-<version>-linux-x86_64.pkg.tar.zst
 ```
 
 The packages install to `/opt/frkn` and ship `frkn.service`; removing the package stops

@@ -133,4 +133,7 @@
     <string name="error_process_lookup">无法按应用分流：内核模块 inet_diag、tcp_diag 和 udp_diag 未加载。这通常发生在内核更新之后——请重启电脑。</string>
     <string name="channel_status_byedpi_blocked">网站无法打开——请更换策略</string>
     <string name="new_apps_channel">新应用的默认通道</string>
+    <string name="logs_clear">清除</string>
+    <string name="logs_clear_title">清除日志？</string>
+    <string name="logs_clear_message">将删除应用和内核的日志记录。</string>
 </resources>

@@ -49,6 +49,8 @@ expect object AppLocale {
 
 expect val supportsSystemAppsFilter: Boolean
 
+expect val scrollbarAlwaysVisible: Boolean
+
 expect val platformNewAppsConnectionType: ConnectionType
 
 expect val platformTextStyle: PlatformTextStyle?

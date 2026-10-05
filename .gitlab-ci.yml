@@ -178,7 +178,7 @@ upload:apk:
       set -e
       VERSION="${CI_COMMIT_TAG#v}"
       for abi in arm64-v8a x86_64 armeabi-v7a universal; do
-        APK="app/build/outputs/apk/release/FRKN-${VERSION}-${abi}.apk"
+        APK="app/build/outputs/apk/release/FRKN-${VERSION}-android-${abi}.apk"
         test -f "$APK" || { echo "Missing release artifact: $APK"; exit 1; }
         curl --fail --location --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
           --upload-file "$APK" \

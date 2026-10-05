@@ -55,6 +55,8 @@ class ServiceClient private constructor(private val channel: SocketChannel) : Au
 
     fun stop() = call("stop", timeoutMs = STOP_TIMEOUT_MS).throwIfFailed()
 
+    fun clearLog() = call("clearLog").throwIfFailed()
+
     fun select(group: String, outbound: String): Boolean = call("select") {
         put("group", group)
         put("outbound", outbound)

@@ -22,4 +22,6 @@ class FrknLog(context: Context) : AppLog {
     override fun e(tag: String, message: String, t: Throwable?) = file.e(tag, message, t)
 
     fun dump(): String = file.dump()
+
+    fun clear() = file.clear()
 }

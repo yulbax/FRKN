@@ -45,9 +45,9 @@ mv "$STAGE/nfpm.full.yaml" "$STAGE/nfpm.yaml"
 cd "$STAGE"
 for format in $FORMATS; do
   case "$format" in
-    deb) file="FRKN-$VERSION-amd64.deb" ;;
-    rpm) file="FRKN-$VERSION-x86_64.rpm" ;;
-    archlinux) file="FRKN-$VERSION-x86_64.pkg.tar.zst" ;;
+    deb) file="FRKN-$VERSION-linux-x86_64.deb" ;;
+    rpm) file="FRKN-$VERSION-linux-x86_64.rpm" ;;
+    archlinux) file="FRKN-$VERSION-linux-x86_64.pkg.tar.zst" ;;
     *) echo "unknown format: $format" >&2; exit 1 ;;
   esac
   "$NFPM" package --config nfpm.yaml --packager "$format" --target "$OUT/$file"

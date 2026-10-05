@@ -26,6 +26,11 @@ class FileAppLog(
         if (logFile.exists()) logFile.readText() else "(empty)"
     }
 
+    fun clear() = synchronized(lock) {
+        logFile.delete()
+        File(logFile.parentFile, logFile.name + ".1").delete()
+    }
+
     private fun log(level: LogLevel, tag: String, message: String, t: Throwable?) {
         val text = buildString {
             append(redactSensitiveData(message))

@@ -134,4 +134,7 @@
     <string name="error_process_lookup">مسیریابی برای هر برنامه در دسترس نیست: ماژول‌های هسته inet_diag، tcp_diag و udp_diag بارگذاری نشده‌اند. معمولاً این پس از به‌روزرسانی هسته رخ می‌دهد — رایانه را دوباره راه‌اندازی کنید.</string>
     <string name="channel_status_byedpi_blocked">سایت‌ها باز نمی‌شوند — راهبرد دیگری را امتحان کنید</string>
     <string name="new_apps_channel">کانال برنامه‌های جدید</string>
+    <string name="logs_clear">پاک کردن</string>
+    <string name="logs_clear_title">گزارش پاک شود؟</string>
+    <string name="logs_clear_message">رویدادهای برنامه و هسته حذف می‌شوند.</string>
 </resources>

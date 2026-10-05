@@ -47,6 +47,11 @@ class DesktopDiagnostics(
             profiles = profiles.profileDiagnostics()
         )
     }
+
+    override suspend fun clear() = withContext(Dispatchers.IO) {
+        log.clear()
+        service.clearCoreLog()
+    }
 }
 
 class DesktopVersionInfo(private val service: DesktopService) : VersionInfo {

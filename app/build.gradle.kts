@@ -171,7 +171,7 @@ androidComponents {
             val abi = output.filters
                 .firstOrNull { it.filterType == FilterConfiguration.FilterType.ABI }
                 ?.identifier ?: "universal"
-            (output as VariantOutputImpl).outputFileName.set(output.versionName.map { "FRKN-$it-$abi.apk" })
+            (output as VariantOutputImpl).outputFileName.set(output.versionName.map { "FRKN-$it-android-$abi.apk" })
         }
     }
 }

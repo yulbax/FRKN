@@ -4,6 +4,8 @@ import android.content.Context
 import io.github.yulbax.frkn.data.profile.ProfileRepository
 import io.github.yulbax.frkn.engine.BYEDPI_VERSION
 import io.github.yulbax.frkn.vpn.FrknVpnService
+import java.io.File
+import java.io.RandomAccessFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import libbox.Libbox
@@ -22,6 +24,12 @@ class AndroidDiagnosticsSource(
     private val profiles: ProfileRepository
 ) : DiagnosticsSource {
     override suspend fun collect(): String = Diagnostics.collect(context, frknLog, versionInfo, profiles)
+
+    override suspend fun clear() = withContext(Dispatchers.IO) {
+        frknLog.clear()
+        runCatching { RandomAccessFile(File(File(context.filesDir, "work"), "box.log"), "rw").use { it.setLength(0) } }
+        Unit
+    }
 }
 
 @Single(binds = [VersionInfo::class])

@@ -144,6 +144,8 @@ actual val platformNewAppsConnectionType: ConnectionType = ConnectionType.DIRECT
 
 actual val supportsSystemAppsFilter: Boolean = false
 
+actual val scrollbarAlwaysVisible: Boolean = true
+
 @OptIn(ExperimentalTextApi::class)
 actual val platformTextStyle: PlatformTextStyle? by lazy {
     if (!systemUsesRgbClearType()) return@lazy null

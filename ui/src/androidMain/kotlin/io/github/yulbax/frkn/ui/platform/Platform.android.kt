@@ -167,4 +167,6 @@ actual val platformNewAppsConnectionType: ConnectionType = ConnectionType.VPN
 
 actual val supportsSystemAppsFilter: Boolean = true
 
+actual val scrollbarAlwaysVisible: Boolean = false
+
 actual val platformTextStyle: PlatformTextStyle? = null
