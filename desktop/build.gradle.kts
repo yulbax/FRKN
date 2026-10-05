@@ -177,10 +177,12 @@ if (System.getProperty("os.name").startsWith("Windows")) {
             "--win-dir-chooser",
             "--win-upgrade-uuid", "6f0b3a2e-6c1b-4a8e-9c7e-3f4d5a1b2c90"
         )
+        val builtName = "FRKN-$appVersion.msi"
         val msiName = "FRKN-$appVersion-windows-x86_64.msi"
+        val msiDir = output.map { it.asFile }
         doLast {
-            val dir = output.get().asFile
-            val built = File(dir, "FRKN-$appVersion.msi")
+            val dir = msiDir.get()
+            val built = File(dir, builtName)
             check(built.renameTo(File(dir, msiName))) { "Could not rename $built to $msiName" }
         }
     }
