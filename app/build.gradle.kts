@@ -51,7 +51,7 @@ android {
         applicationId = "io.github.yulbax.frkn"
         minSdk = 29
         targetSdk = 37
-        versionCode = 10506
+        versionCode = 10507
         versionName = providers.gradleProperty("frkn.versionName").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
