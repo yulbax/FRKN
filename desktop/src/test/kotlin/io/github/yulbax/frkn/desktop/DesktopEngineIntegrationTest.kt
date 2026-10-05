@@ -177,6 +177,17 @@ class DesktopEngineIntegrationTest {
         crashing.stop()
     }
 
+    @Test
+    fun ciadpiSkipsOptionsItsBuildDoesNotSupport() {
+        val ciadpi = CiadpiProcess(File(binDir, "ciadpi"), SilentLog, unsupportedOptions = setOf("--definitely-invalid"))
+        val port = freeLoopbackPort()
+        val exits = CountDownLatch(1)
+        ciadpi.start(port, listOf("-d1", "--definitely-invalid")) { exits.countDown() }
+        assertTrue(waitForPort(port))
+        assertFalse("an unsupported option must not crash ciadpi", exits.await(1, TimeUnit.SECONDS))
+        ciadpi.stop()
+    }
+
     private fun waitForPort(port: Int): Boolean {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (System.nanoTime() < deadline) {
