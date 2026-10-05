@@ -82,6 +82,7 @@ object BackupCodec {
             Ipv6Mode.entries.any { it.wire == settings.ipv6Mode } &&
             isValidDns(settings.dnsRemote) &&
             isValidDns(settings.dnsDirect) &&
+            (settings.newAppsConnectionType.isBlank() || ConnectionType.fromWire(settings.newAppsConnectionType) != null) &&
             (settings.preferredFingerprint.isBlank() ||
                 TlsFingerprint.fromWire(settings.preferredFingerprint) != null)
 

@@ -33,6 +33,7 @@ private val SELECTOR_ICON_WIDTH = 48.dp
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun GlobalTypeConnectedGroup(
+    vpnEnabled: Boolean,
     onSelect: (ConnectionType) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -44,6 +45,7 @@ internal fun GlobalTypeConnectedGroup(
             ElevatedToggleButton(
                 checked = false,
                 onCheckedChange = { onSelect(type) },
+                enabled = vpnEnabled || type != ConnectionType.VPN,
                 shapes = shapes(index),
                 colors = ToggleButtonDefaults.toggleButtonColors(
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -70,6 +72,7 @@ internal fun GlobalTypeConnectedGroup(
 @Composable
 internal fun AppRowConnectedGroup(
     selected: ConnectionType?,
+    vpnEnabled: Boolean,
     onSelect: (ConnectionType) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -85,6 +88,7 @@ internal fun AppRowConnectedGroup(
             ToggleButton(
                 checked = isSelected,
                 onCheckedChange = { if (it) onSelect(type) },
+                enabled = vpnEnabled || type != ConnectionType.VPN,
                 shapes = shapes(index),
                 modifier = Modifier
                     .then(if (isSelected) Modifier.weight(1f) else Modifier.width(SELECTOR_ICON_WIDTH))

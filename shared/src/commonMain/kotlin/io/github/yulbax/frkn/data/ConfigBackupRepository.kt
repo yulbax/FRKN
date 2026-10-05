@@ -83,10 +83,7 @@ class ConfigBackupRepository(
     ): ImportResult {
         val apps = backup.apps?.takeIf { selection.apps }?.let { applyApps(it) }
         val settings = backup.settings?.takeIf { selection.settings }
-        settings?.let { imported ->
-            val routeAllTraffic = database.settingsDao().getSettings()?.routeAllTraffic ?: false
-            database.settingsDao().upsertSettings(imported.toEntity().copy(routeAllTraffic = routeAllTraffic))
-        }
+        settings?.let { database.settingsDao().upsertSettings(it.toEntity()) }
         val profiles = backup.profiles?.takeIf { selection.profiles }?.let { applyProfiles(it) }
         return ImportResult(
             applied = apps?.applied ?: 0,

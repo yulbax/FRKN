@@ -35,30 +35,36 @@ data class AppliedConfig(
 object EngineConfigComposer {
 
     fun compose(inputs: SessionInputs, ownPackage: String, byeDpiPort: Int): AppliedConfig {
-        val selected = inputs.selected ?: throw IllegalStateException("No server selected")
-        val profiles = inputs.profiles
+        val selected = inputs.selected
+        check(selected != null || inputs.profiles.isEmpty()) { "No server selected" }
+        val profiles = if (selected == null) emptyList() else inputs.profiles
         val foreignApps = inputs.apps.filterNot { it.packageName == ownPackage }
-        val routed = RoutedApps.from(foreignApps, inputs.settings.routeAllTraffic)
-        check(!routed.isEmpty) { "No apps assigned to VPN or ByeDPI" }
+        val routed = RoutedApps.from(foreignApps, hasServers = selected != null)
+        check(!routed.isEmpty) {
+            if (selected == null) NO_SERVERS_NO_BYEDPI else "No apps assigned to VPN or ByeDPI"
+        }
 
         return AppliedConfig(
             engineConfig = EngineConfig(
                 proxies = profiles.map { it.engineProxy() },
-                activeProxyTag = ProxyTag.of(selected.id),
+                activeProxyTag = selected?.let { ProxyTag.of(it.id) }.orEmpty(),
                 byeDpiPackages = routed.byeDpiPackages,
                 vpnPackages = routed.vpnPackages,
                 tunneledPackages = routed.tunneledPackages,
                 byeDpiSocksPort = byeDpiPort,
-                network = inputs.settings.networkOptions()
+                network = inputs.settings.networkOptions(),
+                directPaths = routed.directPaths
             ),
-            configName = selected.name.ifBlank { "(unnamed)" },
+            configName = selected?.name?.ifBlank { "(unnamed)" } ?: "(ByeDPI only)",
             membershipKey = profiles.joinToString("|") { "${it.id}:${it.name}:${it.outboundJson}" },
-            sessionRequirements = selected.engineProxy().sessionRequirements,
+            sessionRequirements = selected?.engineProxy()?.sessionRequirements.orEmpty(),
             routingKey = foreignApps.sortedBy { it.packageName }
                 .joinToString("|") { "${it.packageName}=${it.connectionType}" },
             vpnActive = routed.hasVpn
         )
     }
+
+    const val NO_SERVERS_NO_BYEDPI = "Add a server, or assign apps to ByeDPI to run without one"
 
     private fun ProfileEntity.engineProxy(): EngineProxy =
         protocol?.engineProxy(ProxyTag.of(id), outboundJson) ?: EngineProxy(ProxyTag.of(id), outboundJson)

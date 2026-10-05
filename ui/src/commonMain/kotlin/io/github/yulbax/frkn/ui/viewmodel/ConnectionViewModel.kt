@@ -44,7 +44,7 @@ class ConnectionViewModel(
         settingsRepository.settings,
         appDao.getAllApps()
     ) { settings, apps ->
-        val routed = RoutedApps.from(apps, settings.routeAllTraffic)
+        val routed = RoutedApps.from(apps)
         FrknUiState(settings.homeHintSeen, !routed.isEmpty, routed.hasVpn, routed.hasByeDpi)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FrknUiState())
 

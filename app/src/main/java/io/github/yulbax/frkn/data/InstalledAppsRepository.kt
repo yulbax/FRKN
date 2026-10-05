@@ -20,7 +20,8 @@ import org.koin.core.annotation.Single
 @Single(createdAtStart = true, binds = [InstalledAppsSource::class])
 class InstalledAppsRepository(
     context: Context,
-    private val appDao: AppDao
+    private val appDao: AppDao,
+    private val settingsDao: SettingsDao
 ) : InstalledAppsSource {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
@@ -128,7 +129,7 @@ class InstalledAppsRepository(
         val existing = appDao.getApp(packageName)
         appDao.upsertApp(
             existing?.copy(name = installed.name, isSystemApp = installed.isSystemApp)
-                ?: installed.toStoredApp()
+                ?: installed.toStoredApp(newAppsType())
         )
         _installedApps.value = (_installedApps.value.filterNot { it.packageName == packageName } + installed)
             .sortedBy { it.name.lowercase() }
@@ -146,10 +147,11 @@ class InstalledAppsRepository(
         val orphaned = existing.keys.filter { it !in installedPackages }
         if (orphaned.isNotEmpty()) appDao.deleteApps(orphaned)
 
+        val newAppsType = newAppsType()
         val changed = installed.mapNotNull { app ->
             val saved = existing[app.packageName]
             when {
-                saved == null -> app.toStoredApp()
+                saved == null -> app.toStoredApp(newAppsType)
                 saved.name != app.name || saved.isSystemApp != app.isSystemApp ->
                     saved.copy(name = app.name, isSystemApp = app.isSystemApp)
                 else -> null
@@ -169,11 +171,18 @@ class InstalledAppsRepository(
         isLaunchable = isLaunchable
     )
 
-    private fun InstalledApp.toStoredApp() = App(
+    private suspend fun newAppsType(): ConnectionType =
+        (settingsDao.getSettings() ?: SettingsEntity()).newAppsConnectionType(ConnectionType.VPN)
+
+    private fun InstalledApp.toStoredApp(newAppsType: ConnectionType) = App(
         packageName = packageName,
         name = name,
         isSystemApp = isSystemApp,
-        connectionType = if (usesDirectRouting(packageName)) ConnectionType.DIRECT else ConnectionType.VPN
+        connectionType = if (newAppsType == ConnectionType.VPN && usesDirectRouting(packageName)) {
+            ConnectionType.DIRECT
+        } else {
+            newAppsType
+        }
     )
 
     companion object {

@@ -15,11 +15,14 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.kdroid.composetray.tray.api.Tray
+import io.github.yulbax.frkn.data.AppDao
+import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.SettingsRepository
 import io.github.yulbax.frkn.data.profile.ProfileRepository
 import io.github.yulbax.frkn.ui.components.ExitConfirmDialog
 import io.github.yulbax.frkn.ui.components.trayLabels
 import io.github.yulbax.frkn.ui.di.uiModule
+import io.github.yulbax.frkn.ui.platform.ProvideAppLocale
 import io.github.yulbax.frkn.ui.screens.MainScreen
 import io.github.yulbax.frkn.ui.theme.FRKNTheme
 import io.github.yulbax.frkn.util.VpnLauncher
@@ -34,7 +37,7 @@ fun main() {
     val koin = startKoin { modules(desktopModule, uiModule) }.koin
     val controller = koin.get<VpnController>()
     controller.launch()
-    autoConnect(koin.get(), koin.get(), koin.get())
+    autoConnect(koin.get(), koin.get(), koin.get(), koin.get())
 
     val vpnState = koin.get<VpnStateRepository>().state
 
@@ -61,7 +64,7 @@ fun main() {
             state.isMinimized = false
         }
 
-        if (TraySupport.isAvailable) {
+        if (TraySupport.isAvailable) ProvideAppLocale {
             val labels = trayLabels()
             @Suppress("DEPRECATION")
             Tray(
@@ -101,31 +104,33 @@ fun main() {
             LaunchedEffect(visible) {
                 if (visible) window.toFront()
             }
-            FRKNTheme {
-                WindowFrame {
-                    MainScreen(
-                        topBarFrame = { bar -> WindowDraggableArea { bar() } },
-                        topBarActions = {
-                            CaptionButtons(
-                                onMinimize = { if (TraySupport.isAvailable) visible = false else state.isMinimized = true },
-                                onClose = requestExit
-                            )
-                        }
-                    )
-                }
-                if (confirmExit) {
-                    ExitConfirmDialog(
-                        onExit = exit,
-                        onMinimizeToTray = if (TraySupport.isAvailable) {
-                            {
-                                confirmExit = false
-                                visible = false
+            ProvideAppLocale {
+                FRKNTheme {
+                    WindowFrame {
+                        MainScreen(
+                            topBarFrame = { bar -> WindowDraggableArea { bar() } },
+                            topBarActions = {
+                                CaptionButtons(
+                                    onMinimize = { if (TraySupport.isAvailable) visible = false else state.isMinimized = true },
+                                    onClose = requestExit
+                                )
                             }
-                        } else {
-                            null
-                        },
-                        onDismiss = { confirmExit = false }
-                    )
+                        )
+                    }
+                    if (confirmExit) {
+                        ExitConfirmDialog(
+                            onExit = exit,
+                            onMinimizeToTray = if (TraySupport.isAvailable) {
+                                {
+                                    confirmExit = false
+                                    visible = false
+                                }
+                            } else {
+                                null
+                            },
+                            onDismiss = { confirmExit = false }
+                        )
+                    }
                 }
             }
         }
@@ -142,7 +147,10 @@ private fun appIconBytes(): ByteArray =
 private const val APP_ICON = "frkn-icon.png"
 private const val TRAY_ICON_WINDOWS = "frkn-icon.ico"
 
-private fun autoConnect(settings: SettingsRepository, profiles: ProfileRepository, launcher: VpnLauncher) {
-    val shouldConnect = runBlocking { settings.settings.first().autoConnect && profiles.selected.first() != null }
+private fun autoConnect(settings: SettingsRepository, profiles: ProfileRepository, apps: AppDao, launcher: VpnLauncher) {
+    val shouldConnect = runBlocking {
+        settings.settings.first().autoConnect &&
+            (profiles.selected.first() != null || apps.getAllAppsSnapshot().any { it.connectionType == ConnectionType.BYEDPI })
+    }
     if (shouldConnect) launcher.start()
 }

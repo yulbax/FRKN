@@ -30,6 +30,7 @@ import io.github.yulbax.frkn.ui.viewmodel.AppInfo
 @Composable
 internal fun AppsList(
     apps: List<AppInfo>,
+    vpnEnabled: Boolean,
     onConnectionTypeChange: (String, String, Boolean, ConnectionType) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -41,6 +42,7 @@ internal fun AppsList(
             val app = apps[index]
             AppRow(
                 app = app,
+                vpnEnabled = vpnEnabled,
                 onConnectionTypeChange = { type ->
                     onConnectionTypeChange(app.packageName, app.name, app.isSystemApp, type)
                 }
@@ -58,10 +60,11 @@ internal fun AppsList(
 @Composable
 private fun AppRow(
     app: AppInfo,
+    vpnEnabled: Boolean,
     onConnectionTypeChange: (ConnectionType) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val imageBitmap = rememberAppIcon(app.packageName)
+    val imageBitmap = rememberAppIcon(app.packageName, app.path)
 
     Row(
         modifier = modifier
@@ -95,7 +98,7 @@ private fun AppRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = app.packageName,
+                text = app.path ?: app.packageName,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -107,6 +110,7 @@ private fun AppRow(
 
         AppRowConnectedGroup(
             selected = app.connectionType,
+            vpnEnabled = vpnEnabled,
             onSelect = onConnectionTypeChange
         )
     }

@@ -8,6 +8,7 @@ import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.InstalledApp
 import io.github.yulbax.frkn.data.InstalledAppsSource
 import io.github.yulbax.frkn.data.SettingsRepository
+import io.github.yulbax.frkn.data.profile.ProfileRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -20,14 +21,20 @@ data class AppInfo(
     val name: String,
     val isSystemApp: Boolean,
     val isLaunchable: Boolean = true,
-    val connectionType: ConnectionType = ConnectionType.VPN
+    val connectionType: ConnectionType = ConnectionType.VPN,
+    val path: String? = null
 )
 
 class AppsViewModel(
     private val appDao: AppDao,
     private val installedAppsRepository: InstalledAppsSource,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    profileRepository: ProfileRepository
 ) : ViewModel() {
+
+    val hasServers: StateFlow<Boolean> = profileRepository.profiles
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     val appsHintSeen: StateFlow<Boolean> = settingsRepository.settings
         .map { it.appsHintSeen }
@@ -98,6 +105,7 @@ class AppsViewModel(
         packageName = packageName,
         name = name,
         isSystemApp = isSystemApp,
-        isLaunchable = isLaunchable
+        isLaunchable = isLaunchable,
+        path = path
     )
 }

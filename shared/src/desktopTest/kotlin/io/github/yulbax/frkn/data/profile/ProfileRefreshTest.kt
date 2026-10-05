@@ -2,6 +2,8 @@ package io.github.yulbax.frkn.data.profile
 
 import androidx.room.Room
 import io.github.yulbax.frkn.data.AppDatabase
+import io.github.yulbax.frkn.data.ConnectionType
+import io.github.yulbax.frkn.data.App
 import io.github.yulbax.frkn.proxy.ParsedProfile
 import io.github.yulbax.frkn.proxy.ProxyProtocol
 import io.github.yulbax.frkn.util.AppLog
@@ -130,6 +132,24 @@ class ProfileRefreshTest {
 
     private object NoSubscriptions : SubscriptionProfileSource {
         override suspend fun fetch(url: String): List<ParsedProfile> = emptyList()
+    }
+
+    @Test
+    fun deletingTheLastServerMovesVpnAppsToDirect() = runBlocking {
+        val id = database.profileDao().insert(
+            ProfileEntity(name = "Only", type = ProxyProtocol.VLESS.wire, link = "vless://id@example.com:443", outboundJson = "{}")
+        )
+        database.appDao().upsertApps(
+            listOf(
+                App("org.vpn", "Vpn", isSystemApp = false, connectionType = ConnectionType.VPN),
+                App("org.dpi", "Dpi", isSystemApp = false, connectionType = ConnectionType.BYEDPI)
+            )
+        )
+
+        repository.delete(database.profileDao().getAll().single { it.id == id })
+
+        assertEquals(ConnectionType.DIRECT, database.appDao().getApp("org.vpn")?.connectionType)
+        assertEquals(ConnectionType.BYEDPI, database.appDao().getApp("org.dpi")?.connectionType)
     }
 
     private companion object {

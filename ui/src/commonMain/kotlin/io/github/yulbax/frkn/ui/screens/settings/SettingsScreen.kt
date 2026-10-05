@@ -1,5 +1,6 @@
 package io.github.yulbax.frkn.ui.screens.settings
 
+import io.github.yulbax.frkn.ui.platform.supportsSystemAppsFilter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,11 +39,20 @@ fun Settings(
 
         GroupCard(
             title = stringResource(Res.string.applications),
-            items = listOf {
-                SwitchRow(stringResource(Res.string.show_system_apps), ui.showSystemApps) {
-                    viewModel.toggleShowSystemApps()
+            items = listOfNotNull(
+                {
+                    NewAppsChannelRow(ui.newAppsConnectionType, viewModel::setNewAppsConnectionType)
+                },
+                if (supportsSystemAppsFilter) {
+                    {
+                        SwitchRow(stringResource(Res.string.show_system_apps), ui.showSystemApps) {
+                            viewModel.toggleShowSystemApps()
+                        }
+                    }
+                } else {
+                    null
                 }
-            }
+            )
         )
 
         ByeDpiSection(ui, viewModel)

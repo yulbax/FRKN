@@ -38,6 +38,12 @@ interface AppDao {
         }
     }
 
+    @Query("UPDATE apps SET connectionType = :to WHERE connectionType = :from")
+    suspend fun reassignConnectionType(from: ConnectionType, to: ConnectionType): Int
+
+    @Query("UPDATE apps SET path = :path WHERE packageName = :packageName")
+    suspend fun updatePath(packageName: String, path: String?)
+
     @Query("DELETE FROM apps WHERE packageName = :packageName")
     suspend fun deleteApp(packageName: String)
 

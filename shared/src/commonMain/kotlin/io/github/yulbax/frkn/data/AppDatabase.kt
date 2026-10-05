@@ -17,7 +17,7 @@ import kotlinx.coroutines.IO
 
 @Database(
     entities = [App::class, SettingsEntity::class, ProfileEntity::class],
-    version = 4,
+    version = 6,
     exportSchema = true
 )
 @ConstructedBy(AppDatabaseConstructor::class)
@@ -48,6 +48,18 @@ abstract class AppDatabase : RoomDatabase() {
             object : Migration(3, 4) {
                 override fun migrate(connection: SQLiteConnection) {
                     connection.execSQL("ALTER TABLE settings ADD COLUMN routeAllTraffic INTEGER NOT NULL DEFAULT 0")
+                }
+            },
+            object : Migration(4, 5) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL("ALTER TABLE apps ADD COLUMN path TEXT")
+                }
+            },
+            object : Migration(5, 6) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL("ALTER TABLE settings ADD COLUMN newAppsConnectionType TEXT NOT NULL DEFAULT ''")
+                    connection.execSQL("UPDATE settings SET newAppsConnectionType = 'VPN' WHERE routeAllTraffic = 1")
+                    connection.execSQL("ALTER TABLE settings DROP COLUMN routeAllTraffic")
                 }
             }
         )

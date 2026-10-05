@@ -110,7 +110,8 @@ class ServiceEngine(
         probeUser = probeUsername,
         probePass = probePassword,
         options = config.network,
-        routing = AppRouting.DesktopProcesses(directProcesses)
+        routing = AppRouting.DesktopProcesses(directProcesses),
+        directPaths = config.directPaths
     )
 
     private companion object {

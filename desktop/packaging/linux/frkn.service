@@ -4,6 +4,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+ExecStartPre=-modprobe -a inet_diag tcp_diag udp_diag
 ExecStart=/opt/frkn/lib/app/resources/frkn-service run
 Restart=on-failure
 RestartSec=5

@@ -42,6 +42,7 @@ fun Apps(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val appsHintSeen by viewModel.appsHintSeen.collectAsStateWithLifecycle()
+    val hasServers by viewModel.hasServers.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -81,6 +82,7 @@ fun Apps(
                         )
 
                         GlobalTypeConnectedGroup(
+                            vpnEnabled = hasServers,
                             modifier = Modifier.weight(1f),
                             onSelect = { type ->
                                 val snackMsg = snackbarPattern.format(bulkTargets.size, typeLabels.getValue(type))
@@ -107,6 +109,7 @@ fun Apps(
                             filtered.isEmpty() -> EmptyContent()
                             else -> AppsList(
                                 apps = filtered,
+                                vpnEnabled = hasServers,
                                 onConnectionTypeChange = viewModel::setConnectionType
                             )
                         }

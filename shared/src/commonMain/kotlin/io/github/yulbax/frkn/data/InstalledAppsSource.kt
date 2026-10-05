@@ -6,7 +6,8 @@ data class InstalledApp(
     val packageName: String,
     val name: String,
     val isSystemApp: Boolean,
-    val isLaunchable: Boolean
+    val isLaunchable: Boolean,
+    val path: String? = null
 )
 
 interface InstalledAppsSource {

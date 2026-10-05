@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import io.github.yulbax.frkn.data.AppDatabase
+import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.SettingsEntity
 import io.github.yulbax.frkn.util.FrknLog
 import kotlinx.coroutines.CancellationException
@@ -31,15 +32,16 @@ class BootReceiver : BroadcastReceiver(), KoinComponent {
                 withTimeout(RECEIVER_TIMEOUT_MS.milliseconds) {
                     val settings = database.settingsDao().observeSettings().first() ?: SettingsEntity()
                     val serverSelected = database.profileDao().getSelected() != null
+                    val hasByeDpiApps = database.appDao().getAllAppsSnapshot().any { it.connectionType == ConnectionType.BYEDPI }
                     val consentGranted = VpnService.prepare(context) == null
-                    if (settings.autoConnect && serverSelected && consentGranted) {
+                    if (settings.autoConnect && (serverSelected || hasByeDpiApps) && consentGranted) {
                         log.i(TAG, "boot received: starting VPN")
                         FrknVpnService.start(context)
                     } else {
                         log.i(
                             TAG,
                             "autostart skipped: autoConnect=${settings.autoConnect} " +
-                                "serverSelected=$serverSelected consent=$consentGranted"
+                                "serverSelected=$serverSelected byedpiApps=$hasByeDpiApps consent=$consentGranted"
                         )
                     }
                 }

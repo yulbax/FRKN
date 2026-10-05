@@ -27,9 +27,21 @@ chmod 755 "$STAGE/FRKN/lib/app/resources/frkn-service" "$STAGE/FRKN/lib/app/reso
 cp -r "$REPO_ROOT/desktop/packaging/linux/." "$STAGE/"
 cp "$REPO_ROOT/desktop/src/main/resources/frkn-icon.png" "$STAGE/frkn.png"
 cp "$REPO_ROOT/LICENSE" "$STAGE/LICENSE"
-sed -e "s|\${FRKN_VERSION}|$VERSION|" -e "s|\${FRKN_APP_DIR}|./FRKN|" \
+sed -e "s|\${FRKN_VERSION}|$VERSION|" \
     -e "s|\${FRKN_ICON}|./frkn.png|" -e "s|\${FRKN_LICENSE}|./LICENSE|" \
     "$REPO_ROOT/desktop/packaging/linux/nfpm.yaml" > "$STAGE/nfpm.yaml"
+(
+  cd "$STAGE"
+  find FRKN -type d | sort | while read -r dir; do
+    printf '  - dst: /opt/frkn%s\n    type: dir\n    file_info:\n      mode: 0755\n' "${dir#FRKN}"
+  done
+  find FRKN -type f | sort | while read -r file; do
+    printf '  - src: ./%s\n    dst: /opt/frkn%s\n    file_info:\n      mode: 0%s\n' "$file" "${file#FRKN}" "$(stat -c %a "$file")"
+  done
+) > "$STAGE/app-contents.yaml"
+awk -v contents="$STAGE/app-contents.yaml" '{ print } /^contents:$/ { while ((getline line < contents) > 0) print line }' \
+    "$STAGE/nfpm.yaml" > "$STAGE/nfpm.full.yaml"
+mv "$STAGE/nfpm.full.yaml" "$STAGE/nfpm.yaml"
 cd "$STAGE"
 for format in $FORMATS; do
   case "$format" in

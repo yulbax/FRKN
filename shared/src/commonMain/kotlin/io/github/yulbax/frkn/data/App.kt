@@ -8,8 +8,11 @@ data class App(
     @PrimaryKey val packageName: String,
     val name: String,
     val isSystemApp: Boolean,
-    val connectionType: ConnectionType = ConnectionType.VPN
+    val connectionType: ConnectionType = ConnectionType.VPN,
+    val path: String? = null
 )
+
+fun isExecutablePath(id: String): Boolean = '/' in id || '\\' in id
 
 enum class ConnectionType(val wire: String) {
     DIRECT("DIRECT"), BYEDPI("BYEDPI"), VPN("VPN");
@@ -22,19 +25,22 @@ enum class ConnectionType(val wire: String) {
 data class RoutedApps(
     val byeDpiPackages: List<String>,
     val vpnPackages: List<String>,
-    val routeAllTraffic: Boolean = false
+    val directPaths: List<String> = emptyList()
 ) {
     val tunneledPackages: List<String> get() = byeDpiPackages + vpnPackages
     val hasByeDpi: Boolean get() = byeDpiPackages.isNotEmpty()
-    val hasVpn: Boolean get() = vpnPackages.isNotEmpty() || routeAllTraffic
+    val hasVpn: Boolean get() = vpnPackages.isNotEmpty()
     val isEmpty: Boolean get() = !hasByeDpi && !hasVpn
 
     companion object {
-        fun from(apps: List<App>, routeAllTraffic: Boolean = false): RoutedApps = RoutedApps(
-            byeDpiPackages = apps.packagesOf(ConnectionType.BYEDPI),
-            vpnPackages = apps.packagesOf(ConnectionType.VPN),
-            routeAllTraffic = routeAllTraffic
-        )
+        fun from(apps: List<App>, hasServers: Boolean = true): RoutedApps {
+            val direct = if (hasServers) apps.packagesOf(ConnectionType.DIRECT) else apps.packagesOf(ConnectionType.DIRECT) + apps.packagesOf(ConnectionType.VPN)
+            return RoutedApps(
+                byeDpiPackages = apps.packagesOf(ConnectionType.BYEDPI),
+                vpnPackages = if (hasServers) apps.packagesOf(ConnectionType.VPN) else emptyList(),
+                directPaths = direct.filter(::isExecutablePath)
+            )
+        }
 
         private fun List<App>.packagesOf(type: ConnectionType): List<String> =
             filter { it.connectionType == type }.map { it.packageName }

@@ -1,5 +1,7 @@
 package io.github.yulbax.frkn.ui.viewmodel
 
+import io.github.yulbax.frkn.ui.platform.platformNewAppsConnectionType
+import io.github.yulbax.frkn.data.ConnectionType
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.yulbax.frkn.data.AppConfigBackup
@@ -35,6 +37,7 @@ class SettingsViewModel(
     fun toggleShowSystemApps() = update { it.copy(showSystemApps = !it.showSystemApps) }
     fun setByeDpiArgs(args: String) = update { it.copy(byeDpiArgs = args) }
     fun setAutoConnect(value: Boolean) = update { it.copy(autoConnect = value) }
+    fun setNewAppsConnectionType(value: ConnectionType) = update { it.copy(newAppsConnectionType = value.wire) }
 
     fun setTunStack(value: TunStack) = updateNetwork { it.copy(tunStack = value) }
     fun setMtu(value: Int) = updateNetwork { it.copy(mtu = value.coerceIn(NetworkOptions.MTU_RANGE)) }
@@ -43,7 +46,6 @@ class SettingsViewModel(
     fun setDnsDirect(value: String) = updateNetwork { it.copy(dnsDirect = value.trim()) }
     fun setSniff(value: Boolean) = updateNetwork { it.copy(sniff = value) }
     fun setBypassLan(value: Boolean) = updateNetwork { it.copy(bypassLan = value) }
-    fun setRouteAllTraffic(value: Boolean) = updateNetwork { it.copy(routeAllTraffic = value) }
     fun setPreferredFingerprint(value: TlsFingerprint?) = updateNetwork { it.copy(preferredFingerprint = value) }
 
     fun exportConfig(selection: BackupSelection, onReady: (String) -> Unit) {
@@ -88,6 +90,7 @@ data class SettingsUiState(
     val showSystemApps: Boolean = false,
     val byeDpiArgs: String = "",
     val autoConnect: Boolean = false,
+    val newAppsConnectionType: ConnectionType = ConnectionType.DIRECT,
     val network: NetworkOptions = NetworkOptions.DEFAULT
 )
 
@@ -95,5 +98,6 @@ private fun SettingsEntity.toUiState() = SettingsUiState(
     showSystemApps = showSystemApps,
     byeDpiArgs = byeDpiArgs,
     autoConnect = autoConnect,
+    newAppsConnectionType = newAppsConnectionType(platformNewAppsConnectionType),
     network = networkOptions()
 )

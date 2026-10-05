@@ -51,6 +51,7 @@ internal fun ChannelStatusCard(
     up: Boolean,
     hasApps: Boolean,
     latencyMs: Int,
+    noServers: Boolean = false,
     country: String = "",
     shape: Shape,
     modifier: Modifier = Modifier,
@@ -61,16 +62,20 @@ internal fun ChannelStatusCard(
     fillHeight: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
-    val reconnecting = hasApps && active && !up
+    val byedpiBlocked = type == ConnectionType.BYEDPI && active && !up && !checking && total > 0 && reachable == 0
+    val reconnecting = !noServers && hasApps && active && !up && !byedpiBlocked
     val dotColor = when {
-        !hasApps -> MaterialTheme.colorScheme.outline
+        noServers || !hasApps -> MaterialTheme.colorScheme.outline
         !active -> MaterialTheme.colorScheme.outline
+        byedpiBlocked -> MaterialTheme.colorScheme.error
         up -> StatusGreen
         else -> StatusOrange
     }
     val statusLine = when {
+        noServers -> stringResource(Res.string.channel_status_no_servers)
         !hasApps -> stringResource(Res.string.channel_status_no_apps)
         !active -> stringResource(Res.string.channel_status_off)
+        byedpiBlocked -> stringResource(Res.string.channel_status_byedpi_blocked)
         up && latencyMs > 0 -> stringResource(Res.string.channel_status_online, latencyMs)
         up -> stringResource(Res.string.channel_status_ready)
         cycling -> stringResource(Res.string.channel_status_generating_fp)
@@ -125,7 +130,7 @@ internal fun ChannelStatusCard(
                 )
             }
             when {
-                type == ConnectionType.BYEDPI && active && up ->
+                type == ConnectionType.BYEDPI && active && (up || checking || total > 0) ->
                     SignalBars(reachable, total, checking)
                 active && up && country.isNotEmpty() -> CountryFlag(country)
             }

@@ -1,12 +1,24 @@
 package io.github.yulbax.frkn.ui.platform
 
+import io.github.yulbax.frkn.data.ConnectionType
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import java.util.prefs.Preferences
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.Toolkit
+import java.awt.image.BufferedImage
+import java.util.concurrent.ConcurrentHashMap
+import javax.swing.ImageIcon
+import javax.swing.filechooser.FileSystemView
 import java.awt.datatransfer.StringSelection
 import java.io.File
 import java.util.Locale
@@ -50,22 +62,74 @@ actual fun rememberFilePicker(mimeTypes: List<String>, onPicked: (PickedFile) ->
 actual fun rememberSystemVpnSettings(): (() -> Unit)? = null
 
 @Composable
-actual fun rememberAppIcon(appId: String): ImageBitmap? = null
+actual fun rememberAppIcon(appId: String, path: String?): ImageBitmap? =
+    produceState(initialValue = path?.let(ExecutableIcons::cached), key1 = path) {
+        if (value == null && path != null) value = withContext(Dispatchers.IO) { ExecutableIcons.load(path) }
+    }.value
+
+private object ExecutableIcons {
+    private const val SIZE = 64
+    private val isWindows = System.getProperty("os.name").startsWith("Windows")
+    private val icons = ConcurrentHashMap<String, ImageBitmap>()
+
+    fun cached(path: String): ImageBitmap? = icons[path]
+
+    fun load(path: String): ImageBitmap? {
+        if (!isWindows) return null
+        icons[path]?.let { return it }
+        val file = File(path).takeIf { it.isFile } ?: return null
+        val icon = runCatching { FileSystemView.getFileSystemView().getSystemIcon(file, SIZE, SIZE) }.getOrNull()
+            ?: return null
+        val image = BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB)
+        val graphics = image.createGraphics()
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+            if (icon is ImageIcon) {
+                graphics.drawImage(icon.image, 0, 0, SIZE, SIZE, null)
+            } else {
+                icon.paintIcon(null, graphics, (SIZE - icon.iconWidth) / 2, (SIZE - icon.iconHeight) / 2)
+            }
+        } finally {
+            graphics.dispose()
+        }
+        return image.toComposeImageBitmap().also { icons[path] = it }
+    }
+}
 
 @Composable
 actual fun platformColorScheme(darkTheme: Boolean): ColorScheme? = null
 
 actual object AppLocale {
-    private var selected: String? = null
+    private const val KEY = "language"
+    private val systemLocale: Locale = Locale.getDefault()
+    private val preferences: Preferences? = runCatching { Preferences.userRoot().node("io/github/yulbax/frkn") }.getOrNull()
+    private var selected: String? = runCatching { preferences?.get(KEY, null) }.getOrNull()?.ifBlank { null }
+
+    val revision = mutableIntStateOf(0)
+
+    init {
+        selected?.let { Locale.setDefault(Locale.forLanguageTag(it)) }
+    }
 
     actual fun currentTag(): String? = selected
 
     actual fun apply(tag: String?) {
         selected = tag
         Locale.setDefault(tag?.let(Locale::forLanguageTag) ?: systemLocale)
+        runCatching {
+            if (tag == null) preferences?.remove(KEY) else preferences?.put(KEY, tag)
+            preferences?.flush()
+        }
+        revision.intValue++
     }
+}
 
-    private val systemLocale: Locale = Locale.getDefault()
+@Composable
+fun ProvideAppLocale(content: @Composable () -> Unit) {
+    val revision = AppLocale.revision.intValue
+    val density = LocalDensity.current
+    val localeDensity = remember(density, revision) { object : Density by density {} }
+    CompositionLocalProvider(LocalDensity provides localeDensity, content = content)
 }
 
 private fun chooseFile(title: String, mode: Int, suggestedName: String?): File? {
@@ -76,7 +140,9 @@ private fun chooseFile(title: String, mode: Int, suggestedName: String?): File? 
     return File(dialog.directory, name)
 }
 
-actual val supportsRouteAllTraffic: Boolean = true
+actual val platformNewAppsConnectionType: ConnectionType = ConnectionType.DIRECT
+
+actual val supportsSystemAppsFilter: Boolean = false
 
 @OptIn(ExperimentalTextApi::class)
 actual val platformTextStyle: PlatformTextStyle? by lazy {

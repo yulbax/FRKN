@@ -1,5 +1,6 @@
 package io.github.yulbax.frkn.ui.platform
 
+import io.github.yulbax.frkn.data.ConnectionType
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
@@ -35,7 +36,7 @@ expect fun rememberFilePicker(mimeTypes: List<String>, onPicked: (PickedFile) ->
 expect fun rememberSystemVpnSettings(): (() -> Unit)?
 
 @Composable
-expect fun rememberAppIcon(appId: String): ImageBitmap?
+expect fun rememberAppIcon(appId: String, path: String?): ImageBitmap?
 
 @Composable
 expect fun platformColorScheme(darkTheme: Boolean): ColorScheme?
@@ -46,6 +47,8 @@ expect object AppLocale {
     fun apply(tag: String?)
 }
 
-expect val supportsRouteAllTraffic: Boolean
+expect val supportsSystemAppsFilter: Boolean
+
+expect val platformNewAppsConnectionType: ConnectionType
 
 expect val platformTextStyle: PlatformTextStyle?

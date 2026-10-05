@@ -16,7 +16,7 @@ class SocksHealthProbe(
         var country = ""
         while (true) {
             val vpnDelay = if (params.vpnActive) latencyMs(engine.probeSocksPort, vpnProbeUrl, credentials) else null
-            val byedpiDelay = params.byeDpiPort?.let { latencyMs(it, byeDpiProbeUrl, null) }
+            val byedpiDelay = params.byeDpiPort?.let { byeDpiLatencyMs(it) }
             if (vpnDelay != null && country.isEmpty()) {
                 country = resolveCountry(engine.probeSocksPort, credentials) ?: country
             }
@@ -29,8 +29,26 @@ class SocksHealthProbe(
                 fpError = params.isFingerprintError()
             )
             emit(snapshot)
-            delay((if (snapshot.allActiveUp) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS).milliseconds)
+            delay((if (snapshot.vpnHealthy) HEALTH_INTERVAL_MS else HEALTH_RETRY_MS).milliseconds)
         }
+    }
+
+    private val byeDpiCandidates = listOf(byeDpiProbeUrl) + ByeDpiSites.QUICK.sites.map { "https://$it" }
+    private var lastGoodByeDpi = 0
+
+    private suspend fun byeDpiLatencyMs(socksPort: Int): Int? {
+        repeat(BYEDPI_ATTEMPTS) { attempt ->
+            val index = (lastGoodByeDpi + attempt) % byeDpiCandidates.size
+            val url = byeDpiCandidates[index]
+            val start = System.nanoTime()
+            val reached = SocksHttp.request(socksPort, url, "HEAD", BYEDPI_TIMEOUT_MS, null) { it.responseCode } != null
+            if (reached) {
+                lastGoodByeDpi = index
+                return ((System.nanoTime() - start) / 1_000_000).toInt().coerceAtLeast(1)
+            }
+        }
+        lastGoodByeDpi = (lastGoodByeDpi + BYEDPI_ATTEMPTS) % byeDpiCandidates.size
+        return null
     }
 
     private suspend fun latencyMs(socksPort: Int, url: String, credentials: SocksCredentials?): Int? {
@@ -56,6 +74,8 @@ class SocksHealthProbe(
         const val HEALTH_INTERVAL_MS = 15_000L
         const val HEALTH_RETRY_MS = 3_000L
         const val PROBE_TIMEOUT_MS = 6_000
+        const val BYEDPI_TIMEOUT_MS = 4_000
+        const val BYEDPI_ATTEMPTS = 3
         const val GEO_URL = "https://api.ipapi.is/"
         val COUNTRY_REGEX = Regex("\"(?:cc|country_code)\"\\s*:\\s*\"([A-Za-z]{2})\"")
     }

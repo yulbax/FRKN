@@ -12,9 +12,6 @@ homepage: https://github.com/yulbax/FRKN
 license: GPL-3.0-only
 
 contents:
-  - src: ${FRKN_APP_DIR}
-    dst: /opt/frkn
-    type: tree
   - src: /opt/frkn/bin/FRKN
     dst: /usr/bin/frkn
     type: symlink

@@ -69,22 +69,16 @@ class ConfigBuilderTest {
     }
 
     @Test
-    fun desktopRouteAllTrafficSendsUnassignedProcessesThroughTheProxy() {
-        fun finalOf(routeAll: Boolean): String {
-            val config = Json.parseToJsonElement(
-                ConfigBuilder.build(
-                    proxies, "p1", emptyList(), emptyList(), emptyList(), 1081, 2080, "user", "pass",
-                    NetworkOptions(routeAllTraffic = routeAll),
-                    routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"))
-                )
-            ).jsonObject
-            val route = config.getValue("route").jsonObject
-            assertEquals(listOf("ciadpi.exe"), route.getValue("rules").jsonArray.map { it.jsonObject }.processRule("direct"))
-            return route.getValue("final").jsonPrimitive.content
-        }
-
-        assertEquals(ConfigBuilder.PROXY_GROUP_TAG, finalOf(routeAll = true))
-        assertEquals("direct", finalOf(routeAll = false))
+    fun desktopUnassignedProcessesLeaveDirectly() {
+        val config = Json.parseToJsonElement(
+            ConfigBuilder.build(
+                proxies, "p1", emptyList(), listOf("telegram.exe"), listOf("telegram.exe"), 1081, 2080, "user", "pass",
+                routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"))
+            )
+        ).jsonObject
+        val route = config.getValue("route").jsonObject
+        assertEquals(listOf("ciadpi.exe"), route.getValue("rules").jsonArray.map { it.jsonObject }.processRule("direct"))
+        assertEquals("direct", route.getValue("final").jsonPrimitive.content)
     }
 
     @Test
@@ -178,6 +172,53 @@ class ConfigBuilderTest {
         firstOrNull { it["outbound"]?.jsonPrimitive?.content == outbound && it.containsKey("process_name") }
             ?.let { rule -> (rule.getValue("process_name") as JsonArray).map { it.jsonPrimitive.content } }
 
+    private fun golden(name: String): String =
+        requireNotNull(javaClass.getResource("/golden/$name")).readText()
+    @Test
+    fun desktopPathRulesComeBeforeNameRulesAndCanForceDirect() {
+        val config = Json.parseToJsonElement(
+            ConfigBuilder.build(
+                proxies, "p1",
+                byeDpiPackages = listOf("C:\\Tools\\curl.exe"),
+                vpnPackages = listOf("python.exe", "curl.exe"),
+                tunneledPackages = emptyList(),
+                byeDpiPort = 1081, probePort = 2080, probeUser = "user", probePass = "pass",
+                routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe")),
+                directPaths = listOf("C:\\venv\\python.exe")
+            )
+        ).jsonObject
+        val rules = config.getValue("route").jsonObject.getValue("rules").jsonArray.map { it.jsonObject }
+        val keys = rules.mapNotNull { rule ->
+            when {
+                rule.containsKey("process_path") -> "path:" + rule.getValue("outbound").jsonPrimitive.content
+                rule.containsKey("process_name") -> "name:" + rule.getValue("outbound").jsonPrimitive.content
+                else -> null
+            }
+        }
+        assertEquals(listOf("name:direct", "path:byedpi", "path:direct", "name:proxy"), keys)
+        val pathDirect = rules.first { it.containsKey("process_path") && it.getValue("outbound").jsonPrimitive.content == "direct" }
+        assertEquals("C:\\venv\\python.exe", pathDirect.getValue("process_path").jsonArray.single().jsonPrimitive.content)
+    }
+
+    @Test
+    fun withoutServersEverythingLeavesThroughDirectOrByeDpi() {
+        val config = Json.parseToJsonElement(
+            ConfigBuilder.build(
+                emptyList(), "",
+                byeDpiPackages = listOf("org.dpi"), vpnPackages = emptyList(), tunneledPackages = listOf("org.dpi"),
+                byeDpiPort = 1081, probePort = 2080, probeUser = "user", probePass = "pass"
+            )
+        ).jsonObject
+        val outbounds = config.getValue("outbounds").jsonArray.map { it.jsonObject.getValue("tag").jsonPrimitive.content }
+        assertFalse(ConfigBuilder.PROXY_GROUP_TAG in outbounds)
+        val route = config.getValue("route").jsonObject
+        assertEquals("direct", route.getValue("final").jsonPrimitive.content)
+        val remoteDns = config.getValue("dns").jsonObject.getValue("servers").jsonArray.first().jsonObject
+        assertFalse(remoteDns.containsKey("detour"))
+        val probe = route.getValue("rules").jsonArray.map { it.jsonObject }.first { it.containsKey("inbound") }
+        assertEquals("direct", probe.getValue("outbound").jsonPrimitive.content)
+    }
+
     private companion object {
         val AWG_CONFIG = """
             [Interface]
@@ -200,7 +241,4 @@ class ConfigBuilderTest {
             PersistentKeepalive = 25
         """.trimIndent()
     }
-
-    private fun golden(name: String): String =
-        requireNotNull(javaClass.getResource("/golden/$name")).readText()
 }

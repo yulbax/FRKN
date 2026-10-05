@@ -19,6 +19,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+ExecStartPre=-modprobe -a inet_diag tcp_diag udp_diag
 ExecStart=%s run
 Restart=on-failure
 RestartSec=5

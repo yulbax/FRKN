@@ -87,12 +87,14 @@ class VpnSession(
     suspend fun reload(): ReloadOutcome {
         if (!isRunning) return ReloadOutcome.Done
         val inputs = store.load()
-        if (inputs.selected == null) {
-            log.i(TAG, "selected server removed; stopping")
-            return ReloadOutcome.SelectionRemoved
-        }
         val current = checkNotNull(appliedConfig) { "VPN has no applied config" }
-        val desired = EngineConfigComposer.compose(inputs, ownPackage, byeDpiPort)
+        val desired = runCatching { EngineConfigComposer.compose(inputs, ownPackage, byeDpiPort) }.getOrElse { error ->
+            if (inputs.selected == null) {
+                log.i(TAG, "selected server removed and nothing else to run; stopping")
+                return ReloadOutcome.SelectionRemoved
+            }
+            throw error
+        }
         val structuralChange = desired.isStructuralChangeFrom(current)
         val serverSwitched = desired.selectedTag != current.selectedTag
         if (!structuralChange && !serverSwitched) return ReloadOutcome.Done
@@ -109,7 +111,7 @@ class VpnSession(
 
     suspend fun recover() {
         if (!isRunning) return
-        log.i(TAG, "both channels down; reloading service")
+        log.i(TAG, "vpn channel down; reloading service")
         applyReload(EngineConfigComposer.compose(store.load(), ownPackage, byeDpiPort))
         stateRepository.update(VpnState.Verifying)
         startHealth()
@@ -264,7 +266,7 @@ class VpnSession(
                 ),
                 onRefreshSubscription = { refreshSubscription() },
                 onRecoveryReload = { requestWork(Command.Recover) },
-                onByedpiUp = { requestWork(Command.CheckByeDpi) }
+                onByedpiChanged = { requestWork(Command.CheckByeDpi) }
             )
         )
     }

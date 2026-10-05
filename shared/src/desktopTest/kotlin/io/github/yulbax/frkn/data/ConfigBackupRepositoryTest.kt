@@ -8,7 +8,6 @@ import io.github.yulbax.frkn.util.AppLog
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConfigBackupRepositoryTest {
@@ -24,18 +23,18 @@ class ConfigBackupRepositoryTest {
     }
 
     @Test
-    fun importingSettingsKeepsTheDeviceRouteAllTrafficChoice() = runBlocking {
-        database.settingsDao().upsertSettings(SettingsEntity(routeAllTraffic = true, mtu = 1500))
+    fun importingSettingsCarriesTheNewAppsChannel() = runBlocking {
+        database.settingsDao().upsertSettings(SettingsEntity(mtu = 1500))
         val backup = AppConfigBackup(
             version = AppConfigBackup.CURRENT_VERSION,
-            settings = BackupSettings(mtu = 1280)
+            settings = SettingsEntity(mtu = 1280, newAppsConnectionType = ConnectionType.BYEDPI.wire).toBackupSettings()
         )
 
         repository.apply(backup, BackupSelection(settings = true, apps = false, profiles = false))
 
         val settings = requireNotNull(database.settingsDao().getSettings())
         assertEquals(1280, settings.mtu)
-        assertTrue(settings.routeAllTraffic)
+        assertEquals(ConnectionType.BYEDPI, settings.newAppsConnectionType(ConnectionType.DIRECT))
     }
 
     private object NoSubscriptions : SubscriptionProfileSource {

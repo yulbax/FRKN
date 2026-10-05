@@ -90,7 +90,7 @@ internal fun ConnectionCard(
         VpnState.Connecting -> stringResource(Res.string.vpn_establishing_tunnel)
         VpnState.Verifying -> stringResource(Res.string.vpn_checking_connectivity)
         is VpnState.Connected -> stringResource(Res.string.vpn_tap_to_disconnect)
-        is VpnState.Error -> state.message
+        is VpnState.Error -> if (state.isProcessLookupUnavailable) stringResource(Res.string.error_process_lookup) else state.message
     }
     Box(
         modifier = modifier

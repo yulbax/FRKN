@@ -3,6 +3,7 @@ package io.github.yulbax.frkn.desktop
 import androidx.room.Room
 import io.github.yulbax.frkn.data.AppDatabase
 import io.github.yulbax.frkn.data.ConfigBackupRepository
+import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.InstalledAppsSource
 import io.github.yulbax.frkn.data.RoomVpnSessionStore
 import io.github.yulbax.frkn.data.SettingsRepository
@@ -27,6 +28,7 @@ import io.github.yulbax.frkn.vpn.VpnStateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import org.koin.dsl.module
 
 val desktopModule = module {
@@ -58,7 +60,10 @@ val desktopModule = module {
     }
     single<VersionInfo> { DesktopVersionInfo(get()) }
     single<InstalledAppsSource>(createdAtStart = true) {
-        ProcessInstalledApps(get(), DesktopPaths.ownExecutable, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        val settings = get<SettingsRepository>()
+        ProcessInstalledApps(get(), DesktopPaths.ownExecutable, CoroutineScope(SupervisorJob() + Dispatchers.IO)) {
+            settings.settings.first().newAppsConnectionType(ConnectionType.DIRECT)
+        }
     }
 
     single {

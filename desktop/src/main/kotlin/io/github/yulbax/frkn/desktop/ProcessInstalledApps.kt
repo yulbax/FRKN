@@ -20,7 +20,8 @@ import kotlin.time.Duration.Companion.seconds
 class ProcessInstalledApps(
     private val appDao: AppDao,
     private val ownExecutable: String?,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val newAppsType: suspend () -> ConnectionType
 ) : InstalledAppsSource {
 
     private val _installedApps = MutableStateFlow<List<InstalledApp>>(emptyList())
@@ -51,17 +52,20 @@ class ProcessInstalledApps(
 
     private suspend fun refresh() = refreshMutex.withLock {
         try {
-            val running = runningExecutables()
+            val running = discover(runningExecutables(), ownExecutable, systemRoots)
             val saved = appDao.getAllAppsSnapshot()
-            val savedNames = saved.mapTo(HashSet()) { it.packageName }
-            val discovered = running.filter { it.packageName !in savedNames }
+            val savedById = saved.associateBy { it.packageName }
+            val discovered = running.filter { it.packageName !in savedById }
             if (discovered.isNotEmpty()) {
-                appDao.upsertApps(discovered.map { App(it.packageName, it.name, it.isSystemApp, ConnectionType.DIRECT) })
+                val type = newAppsType()
+                appDao.upsertApps(discovered.map { App(it.packageName, it.name, it.isSystemApp, type, it.path) })
             }
-            val runningNames = running.mapTo(HashSet()) { it.packageName }
+            running.filter { it.path != null && savedById[it.packageName]?.let { app -> app.path != it.path } == true }
+                .forEach { appDao.updatePath(it.packageName, it.path) }
+            val runningIds = running.mapTo(HashSet()) { it.packageName }
             val remembered = saved
-                .filter { it.packageName !in runningNames && it.packageName != ownExecutable }
-                .map { InstalledApp(it.packageName, it.name, it.isSystemApp, isLaunchable = true) }
+                .filter { it.packageName !in runningIds && File(it.packageName).name != ownExecutable }
+                .map { InstalledApp(it.packageName, it.name, it.isSystemApp, isLaunchable = true, path = it.path) }
             _installedApps.value = (running + remembered).sortedBy { it.name.lowercase() }
             _error.value = null
         } catch (cancelled: CancellationException) {
@@ -73,24 +77,35 @@ class ProcessInstalledApps(
         }
     }
 
-    private fun runningExecutables(): List<InstalledApp> =
+    private fun runningExecutables(): List<File> =
         ProcessHandle.allProcesses()
             .map { it.info().command().orElse(null) }
             .toList()
             .filterNotNull()
             .map(::File)
-            .filter { it.name.isNotBlank() && it.name != ownExecutable }
-            .distinctBy { it.name }
-            .map { file ->
-                InstalledApp(
-                    packageName = file.name,
-                    name = file.nameWithoutExtension,
-                    isSystemApp = systemRoots.any { file.path.startsWith(it, ignoreCase = true) },
-                    isLaunchable = true
-                )
-            }
 
-    private companion object {
-        val REFRESH_INTERVAL = 15.seconds
+    companion object {
+        private val REFRESH_INTERVAL = 15.seconds
+
+        fun discover(executables: List<File>, ownExecutable: String?, systemRoots: List<String>): List<InstalledApp> =
+            executables
+                .filter { it.name.isNotBlank() && it.name != ownExecutable }
+                .distinctBy { it.path.lowercase() }
+                .groupBy { it.name }
+                .flatMap { (name, copies) ->
+                    fun app(id: String, path: String?, file: File) = InstalledApp(
+                        packageName = id,
+                        name = file.nameWithoutExtension,
+                        isSystemApp = systemRoots.any { file.path.startsWith(it, ignoreCase = true) },
+                        isLaunchable = true,
+                        path = path
+                    )
+                    val first = copies.first()
+                    if (copies.size == 1) {
+                        listOf(app(name, first.path, first))
+                    } else {
+                        listOf(app(name, null, first)) + copies.map { app(it.path, it.path, it) }
+                    }
+                }
     }
 }

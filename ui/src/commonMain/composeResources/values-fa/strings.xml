@@ -35,7 +35,6 @@
     <string name="direct_dns">DNS مستقیم (شبکه زیرین)</string>
     <string name="sniff_destination">شناسایی مقصد (sniff)</string>
     <string name="bypass_lan">دور زدن LAN (IPهای خصوصی مستقیم)</string>
-    <string name="route_all_traffic">همه ترافیک از طریق VPN</string>
     <string name="byedpi_cli_args">خط فرمان ByeDPI</string>
     <string name="show_system_apps">نمایش برنامه‌های سیستمی</string>
     <string name="autostart_title">اتصال خودکار</string>
@@ -130,4 +129,9 @@
     <string name="exit_confirm_exit">خروج</string>
     <string name="exit_confirm_tray">کوچک‌سازی به سینی سیستم</string>
     <string name="tray_open">باز کردن FRKN</string>
+    <string name="channel_status_no_servers">سروری نیست</string>
+    <string name="delete_last_server_message">«%1$s» حذف شود؟ این آخرین سرور است: برنامه‌های کانال VPN به کانال مستقیم منتقل می‌شوند.</string>
+    <string name="error_process_lookup">مسیریابی برای هر برنامه در دسترس نیست: ماژول‌های هسته inet_diag، tcp_diag و udp_diag بارگذاری نشده‌اند. معمولاً این پس از به‌روزرسانی هسته رخ می‌دهد — رایانه را دوباره راه‌اندازی کنید.</string>
+    <string name="channel_status_byedpi_blocked">سایت‌ها باز نمی‌شوند — راهبرد دیگری را امتحان کنید</string>
+    <string name="new_apps_channel">کانال برنامه‌های جدید</string>
 </resources>

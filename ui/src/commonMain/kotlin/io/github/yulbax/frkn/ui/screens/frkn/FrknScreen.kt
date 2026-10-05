@@ -182,7 +182,11 @@ fun FrknScreen(
                 TextButton(onClick = { deleting = null }) { Text(stringResource(Res.string.cancel)) }
             },
             title = { Text(stringResource(Res.string.delete_server_title)) },
-            text = { Text(stringResource(Res.string.delete_server_message, displayName)) }
+            text = {
+                val last = servers.profiles.size == 1 && ui.hasVpnApps
+                val message = if (last) Res.string.delete_last_server_message else Res.string.delete_server_message
+                Text(stringResource(message, displayName))
+            }
         )
     }
 
@@ -289,8 +293,8 @@ private fun ColumnScope.ConnectionSection(c: FrknScreenContent, landscape: Boole
         Spacer(Modifier.height(12.dp))
     }
 
-    val enabled = c.state != VpnState.Connecting &&
-        (c.connected || (c.servers.selected != null && c.ui.hasRoutedApps))
+    val canStart = c.ui.hasByedpiApps || (c.servers.selected != null && c.ui.hasRoutedApps)
+    val enabled = c.state != VpnState.Connecting && (c.connected || canStart)
 
     if (landscape) {
         ConnectionCard(
@@ -335,6 +339,7 @@ private fun ChannelsRow(c: FrknScreenContent, modifier: Modifier = Modifier, fil
             active = c.connected,
             up = c.stats.vpnUp,
             hasApps = c.ui.hasVpnApps,
+            noServers = c.servers.profiles.isEmpty(),
             cycling = c.stats.vpnCycling,
             latencyMs = c.stats.vpnLatencyMs,
             country = c.stats.vpnCountry,
@@ -354,7 +359,7 @@ private fun ChannelsRow(c: FrknScreenContent, modifier: Modifier = Modifier, fil
             reachable = c.stats.byedpiReachable,
             total = c.stats.byedpiTotal,
             checking = c.stats.byedpiChecking,
-            onClick = if (c.stats.byedpiActive && c.stats.byedpiUp) c.onByedpiClick else null
+            onClick = if (c.stats.byedpiActive) c.onByedpiClick else null
         )
     }
 }

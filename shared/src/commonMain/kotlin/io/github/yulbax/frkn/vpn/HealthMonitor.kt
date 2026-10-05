@@ -26,7 +26,7 @@ data class HealthParams(
     val probe: ProbeParams,
     val onRefreshSubscription: suspend () -> Unit,
     val onRecoveryReload: suspend () -> Unit,
-    val onByedpiUp: suspend () -> Unit
+    val onByedpiChanged: suspend () -> Unit
 )
 
 data class HealthSnapshot(
@@ -41,6 +41,7 @@ data class HealthSnapshot(
     val byedpiUp get() = byedpiDelayMs != null
     val anyUp get() = vpnUp || byedpiUp
     val allActiveUp get() = (!vpnActive || vpnUp) && (!byedpiActive || byedpiUp)
+    val vpnHealthy get() = (!vpnActive || vpnUp) && !fpError
 }
 
 interface HealthProbe {
@@ -77,8 +78,8 @@ class HealthMonitor(
         childScope.launch {
             var failures = 0
             health.collect { snapshot ->
-                failures = if (snapshot.allActiveUp) 0 else failures + 1
-                if (!snapshot.allActiveUp) recover(failures, snapshot, params)
+                failures = if (snapshot.vpnHealthy) 0 else failures + 1
+                if (!snapshot.vpnHealthy) recover(failures, snapshot, params)
             }
         }
     }
@@ -118,10 +119,10 @@ class HealthMonitor(
     private suspend fun onByedpiTransition(s: HealthSnapshot, params: HealthParams) {
         if (s.byedpiUp) {
             log.i(TAG, "byedpi channel up (${s.byedpiDelayMs}ms)")
-            params.onByedpiUp()
         } else {
             log.w(TAG, "byedpi channel down")
         }
+        params.onByedpiChanged()
     }
 
     private suspend fun recover(failures: Int, s: HealthSnapshot, params: HealthParams) {

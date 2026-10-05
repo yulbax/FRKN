@@ -1,5 +1,6 @@
 package io.github.yulbax.frkn.vpn.singbox
 
+import io.github.yulbax.frkn.data.isExecutablePath
 import io.github.yulbax.frkn.vpn.core.EnginePlacement
 import io.github.yulbax.frkn.vpn.core.EngineProxy
 import io.github.yulbax.frkn.vpn.core.EngineRequirement
@@ -37,6 +38,13 @@ object ConfigBuilder {
     private const val PROBE_INBOUND_TAG = "probe-in"
     private const val REMOTE_DNS_TAG = "remote"
     private const val IPV4_ONLY = "ipv4_only"
+    private const val PROCESS_PATH_KEY = "process_path"
+
+    private fun appRule(key: String, apps: List<String>, outbound: String): JsonObject = buildJsonObject {
+        putJsonArray(key) { apps.forEach { add(it) } }
+        put("action", "route")
+        put("outbound", outbound)
+    }
 
     fun build(
         proxies: List<EngineProxy>,
@@ -49,10 +57,11 @@ object ConfigBuilder {
         probeUser: String,
         probePass: String,
         options: NetworkOptions = NetworkOptions(),
-        routing: AppRouting = AppRouting.AndroidPackages
+        routing: AppRouting = AppRouting.AndroidPackages,
+        directPaths: List<String> = emptyList()
     ): String {
-        require(proxies.isNotEmpty()) { "No proxy outbounds" }
         val ipv6Enabled = options.ipv6Mode.ipv6Enabled
+        val proxyTarget = if (proxies.isEmpty()) "direct" else PROXY_GROUP_TAG
 
         val proxyObjects = proxies.map { proxy ->
             val outbound = JsonObject((Json.parseToJsonElement(proxy.outboundDescriptor) as JsonObject).toMutableMap().apply {
@@ -66,9 +75,8 @@ object ConfigBuilder {
             proxy to decorated
         }
         val (proxyEndpoints, proxyOutbounds) = proxyObjects.partition { it.first.placement == EnginePlacement.ENDPOINT }
-        val active = proxies.firstOrNull { it.tag == activeProxyTag } ?: proxies.first()
-        val defaultTag = active.tag
-        val sessionRequirements = active.sessionRequirements
+        val active = proxies.firstOrNull { it.tag == activeProxyTag } ?: proxies.firstOrNull()
+        val sessionRequirements = active?.sessionRequirements.orEmpty()
         val dnsStrategy =
             if (EngineRequirement.IPV4_ONLY in sessionRequirements) IPV4_ONLY else options.ipv6Mode.dnsStrategy
 
@@ -85,7 +93,7 @@ object ConfigBuilder {
                         put("tag", REMOTE_DNS_TAG)
                         put("type", "tls")
                         put("server", options.dnsRemote)
-                        put("detour", PROXY_GROUP_TAG)
+                        if (proxies.isNotEmpty()) put("detour", PROXY_GROUP_TAG)
                     })
                     add(buildJsonObject {
                         put("tag", "local")
@@ -153,13 +161,15 @@ object ConfigBuilder {
 
             putJsonArray("outbounds") {
                 proxyOutbounds.forEach { add(it.second) }
-                add(buildJsonObject {
-                    put("type", "selector")
-                    put("tag", PROXY_GROUP_TAG)
-                    putJsonArray("outbounds") { proxies.forEach { add(it.tag) } }
-                    put("default", defaultTag)
-                    put("interrupt_exist_connections", true)
-                })
+                if (active != null) {
+                    add(buildJsonObject {
+                        put("type", "selector")
+                        put("tag", PROXY_GROUP_TAG)
+                        putJsonArray("outbounds") { proxies.forEach { add(it.tag) } }
+                        put("default", active.tag)
+                        put("interrupt_exist_connections", true)
+                    })
+                }
                 add(buildJsonObject {
                     put("type", "socks")
                     put("tag", "byedpi")
@@ -194,7 +204,7 @@ object ConfigBuilder {
                     add(buildJsonObject {
                         putJsonArray("inbound") { add(PROBE_INBOUND_TAG) }
                         put("action", "route")
-                        put("outbound", PROXY_GROUP_TAG)
+                        put("outbound", proxyTarget)
                     })
                     if (routing is AppRouting.DesktopProcesses && routing.directProcesses.isNotEmpty()) {
                         add(buildJsonObject {
@@ -210,27 +220,22 @@ object ConfigBuilder {
                             put("outbound", "direct")
                         })
                     }
-                    if (byeDpiPackages.isNotEmpty()) {
-                        add(buildJsonObject {
-                            putJsonArray(routing.appRuleKey) {
-                                byeDpiPackages.forEach { add(it) }
-                            }
-                            put("action", "route")
-                            put("outbound", "byedpi")
-                        })
+                    val appRules = listOf(
+                        byeDpiPackages to "byedpi",
+                        vpnPackages to proxyTarget,
+                        directPaths to "direct"
+                    )
+                    appRules.forEach { (apps, outbound) ->
+                        val paths = apps.filter(::isExecutablePath)
+                        if (paths.isNotEmpty()) add(appRule(PROCESS_PATH_KEY, paths, outbound))
                     }
-                    if (vpnPackages.isNotEmpty()) {
-                        add(buildJsonObject {
-                            putJsonArray(routing.appRuleKey) {
-                                vpnPackages.forEach { add(it) }
-                            }
-                            put("action", "route")
-                            put("outbound", PROXY_GROUP_TAG)
-                        })
+                    appRules.forEach { (apps, outbound) ->
+                        val names = apps.filterNot(::isExecutablePath)
+                        if (names.isNotEmpty()) add(appRule(routing.appRuleKey, names, outbound))
                     }
                     if (routing is AppRouting.AndroidPackages) add(buildJsonObject { put("action", "reject") })
                 }
-                put("final", if (routing is AppRouting.AndroidPackages || options.routeAllTraffic) PROXY_GROUP_TAG else "direct")
+                put("final", if (routing is AppRouting.AndroidPackages) proxyTarget else "direct")
                 put("auto_detect_interface", true)
                 put("default_domain_resolver", "local")
             }

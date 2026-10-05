@@ -1,6 +1,7 @@
 package io.github.yulbax.frkn.data.profile
 
 import io.github.yulbax.frkn.data.AppDatabase
+import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.proxy.LinkParser
 import io.github.yulbax.frkn.proxy.ParsedProfile
 import io.github.yulbax.frkn.util.AppLog
@@ -77,6 +78,9 @@ class ProfileRepository(
         database.transaction {
             profileDao.delete(profile)
             ensureSelection()
+            if (profileDao.getAll().isEmpty()) {
+                database.appDao().reassignConnectionType(ConnectionType.VPN, ConnectionType.DIRECT)
+            }
         }
     }
 

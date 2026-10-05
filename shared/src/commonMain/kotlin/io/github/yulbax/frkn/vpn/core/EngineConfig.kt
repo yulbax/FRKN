@@ -7,7 +7,8 @@ data class EngineConfig(
     val vpnPackages: List<String>,
     val tunneledPackages: List<String>,
     val byeDpiSocksPort: Int,
-    val network: NetworkOptions
+    val network: NetworkOptions,
+    val directPaths: List<String> = emptyList()
 )
 
 data class EngineProxy(

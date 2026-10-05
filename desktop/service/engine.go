@@ -129,6 +129,9 @@ func (e *engine) start(config string) error {
 	if e.current != nil {
 		return errors.New("sing-box is already running")
 	}
+	if err := checkProcessLookup(); err != nil {
+		return err
+	}
 	started, err := create(config, releaseAdapters)
 	if err != nil {
 		return err

@@ -35,7 +35,6 @@
     <string name="direct_dns">直连 DNS（底层网络）</string>
     <string name="sniff_destination">嗅探目标</string>
     <string name="bypass_lan">绕过局域网（私有 IP 直连）</string>
-    <string name="route_all_traffic">所有流量通过 VPN</string>
     <string name="byedpi_cli_args">ByeDPI 命令行</string>
     <string name="show_system_apps">显示系统应用</string>
     <string name="autostart_title">自动连接</string>
@@ -129,4 +128,9 @@
     <string name="exit_confirm_exit">退出</string>
     <string name="exit_confirm_tray">最小化到托盘</string>
     <string name="tray_open">打开 FRKN</string>
+    <string name="channel_status_no_servers">没有服务器</string>
+    <string name="delete_last_server_message">确定删除“%1$s”吗？这是最后一个服务器：VPN 通道中的应用将改为直连。</string>
+    <string name="error_process_lookup">无法按应用分流：内核模块 inet_diag、tcp_diag 和 udp_diag 未加载。这通常发生在内核更新之后——请重启电脑。</string>
+    <string name="channel_status_byedpi_blocked">网站无法打开——请更换策略</string>
+    <string name="new_apps_channel">新应用的默认通道</string>
 </resources>

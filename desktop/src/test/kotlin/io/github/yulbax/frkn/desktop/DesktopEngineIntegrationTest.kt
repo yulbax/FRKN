@@ -5,6 +5,7 @@ import io.github.yulbax.frkn.vpn.HealthSnapshot
 import io.github.yulbax.frkn.vpn.ProbeParams
 import io.github.yulbax.frkn.vpn.ProbeUrls
 import io.github.yulbax.frkn.vpn.SocksHealthProbe
+import io.github.yulbax.frkn.vpn.VpnState
 import io.github.yulbax.frkn.vpn.core.EngineConfig
 import io.github.yulbax.frkn.vpn.core.EngineProxy
 import io.github.yulbax.frkn.vpn.core.NetworkOptions
@@ -72,8 +73,23 @@ class DesktopEngineIntegrationTest {
             options = NetworkOptions(),
             routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe"))
         )
+        val noServers = ConfigBuilder.build(
+            proxies = emptyList(),
+            activeProxyTag = "",
+            byeDpiPackages = listOf("Discord.exe"),
+            vpnPackages = emptyList(),
+            tunneledPackages = listOf("Discord.exe"),
+            byeDpiPort = 1081,
+            probePort = 2080,
+            probeUser = "user",
+            probePass = "pass",
+            options = NetworkOptions(),
+            routing = AppRouting.DesktopProcesses(listOf("ciadpi.exe")),
+            directPaths = listOf("C:\\venv\\python.exe")
+        )
         ServiceClient.connect(startService()).use { client ->
             client.check(config)
+            client.check(noServers)
             val failure = runCatching { client.check("""{"outbounds": [{"type": "no-such-type"}]}""") }.exceptionOrNull()
             assertNotNull("an invalid config must be rejected", failure)
         }
@@ -103,6 +119,14 @@ class DesktopEngineIntegrationTest {
         val client = service.connect()
         assertEquals(File(workDir, "svc").absoluteFile, service.hello?.workDir)
         assertTrue(service.hello?.core.orEmpty().isNotEmpty())
+
+        val firstStart = runCatching { client.start(config) }.exceptionOrNull()
+        assumeTrue(
+            "this kernel cannot report socket owners (inet_diag/tcp_diag/udp_diag not loaded)",
+            firstStart?.message?.contains(VpnState.PROCESS_LOOKUP_UNAVAILABLE) != true
+        )
+        firstStart?.let { throw it }
+        client.stop()
 
         repeat(2) {
             client.start(config)

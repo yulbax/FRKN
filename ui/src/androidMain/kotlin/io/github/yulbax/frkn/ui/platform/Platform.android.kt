@@ -1,5 +1,6 @@
 package io.github.yulbax.frkn.ui.platform
 
+import io.github.yulbax.frkn.data.ConnectionType
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -111,7 +112,7 @@ actual fun rememberSystemVpnSettings(): (() -> Unit)? {
 }
 
 @Composable
-actual fun rememberAppIcon(appId: String): ImageBitmap? {
+actual fun rememberAppIcon(appId: String, path: String?): ImageBitmap? {
     val context = LocalContext.current
     return produceState(initialValue = AppIconCache.get(appId), key1 = appId) {
         if (value == null) {
@@ -162,6 +163,8 @@ actual object AppLocale {
     }
 }
 
-actual val supportsRouteAllTraffic: Boolean = false
+actual val platformNewAppsConnectionType: ConnectionType = ConnectionType.VPN
+
+actual val supportsSystemAppsFilter: Boolean = true
 
 actual val platformTextStyle: PlatformTextStyle? = null

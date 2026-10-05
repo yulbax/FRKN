@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AppDatabaseUpgradeTest {
@@ -31,7 +32,7 @@ class AppDatabaseUpgradeTest {
             assertEquals(1500, settings.mtu)
             assertEquals("", settings.preferredFingerprint)
             assertFalse(settings.homeHintSeen)
-            assertFalse(settings.routeAllTraffic)
+            assertEquals(ConnectionType.DIRECT, settings.newAppsConnectionType(ConnectionType.DIRECT))
             assertSeededRows(database)
         }
         open().useDatabase { database -> assertSeededRows(database) }
@@ -44,13 +45,28 @@ class AppDatabaseUpgradeTest {
         open().useDatabase { database ->
             val settings = requireNotNull(database.settingsDao().getSettings())
             assertEquals("chrome", settings.preferredFingerprint)
-            assertFalse(settings.routeAllTraffic)
+            assertEquals(ConnectionType.DIRECT, settings.newAppsConnectionType(ConnectionType.DIRECT))
+            assertSeededRows(database)
+        }
+    }
+
+    @Test
+    fun routeAllTrafficBecomesVpnForNewApps() = runBlocking {
+        seed(version = 4, settingsColumns = SETTINGS_V4_COLUMNS, settingsValues = SETTINGS_V4_VALUES, identityHash = "legacy")
+
+        open().useDatabase { database ->
+            val settings = requireNotNull(database.settingsDao().getSettings())
+            assertEquals(ConnectionType.VPN, settings.newAppsConnectionType(ConnectionType.DIRECT))
             assertSeededRows(database)
         }
     }
 
     private suspend fun assertSeededRows(database: AppDatabase) {
         assertEquals(ConnectionType.BYEDPI, database.appDao().getApp("com.example.app")?.connectionType)
+        assertNull(database.appDao().getApp("com.example.app")?.path)
+        database.appDao().updatePath("com.example.app", "/opt/example/app")
+        assertEquals("/opt/example/app", database.appDao().getApp("com.example.app")?.path)
+        database.appDao().updatePath("com.example.app", null)
         val profile: ProfileEntity = database.profileDao().observeSelected().first()!!
         assertEquals(ProxyProtocol.VLESS.wire, profile.type)
         assertEquals(ProxyProtocol.VLESS, profile.protocol)
@@ -101,5 +117,7 @@ class AppDatabaseUpgradeTest {
             ", `preferredFingerprint` TEXT NOT NULL, `homeHintSeen` INTEGER NOT NULL, `appsHintSeen` INTEGER NOT NULL"
         const val SETTINGS_V1_VALUES = "1, 0, '', 'gvisor', 1500, 'disable', '1.1.1.1', '1.1.1.1', 1, 0, 0"
         const val SETTINGS_V3_VALUES = "$SETTINGS_V1_VALUES, 'chrome', 1, 0"
+        const val SETTINGS_V4_COLUMNS = "$SETTINGS_V3_COLUMNS, `routeAllTraffic` INTEGER NOT NULL"
+        const val SETTINGS_V4_VALUES = "$SETTINGS_V3_VALUES, 1"
     }
 }
