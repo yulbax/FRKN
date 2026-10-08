@@ -59,7 +59,10 @@ class ProfileRepository(
         if (parsed !is FetchResult.Success) return parsed.toOperationResult()
         if (parsed.profiles.isEmpty()) return ProfileOperationResult.EmptySubscription
 
-        val fresh = parsed.profiles.firstOrNull { it.name == profile.name } ?: parsed.profiles.first()
+        val serverKey = profile.link.serverKey()
+        val fresh = parsed.profiles.firstOrNull { it.link.serverKey() == serverKey }
+            ?: parsed.profiles.singleOrNull { it.name == profile.name }
+            ?: return ProfileOperationResult.Success(affected = 0)
         profileDao.updateConfig(
             id = profile.id,
             name = profile.name,
@@ -173,6 +176,8 @@ class ProfileRepository(
 
     private fun String.isHttpUrl(): Boolean =
         startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)
+
+    private fun String.serverKey(): String = trim().let { if ('\n' in it) it else it.substringBefore('#') }
 
     private sealed interface FetchResult {
         data class Success(val profiles: List<ParsedProfile>) : FetchResult

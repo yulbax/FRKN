@@ -63,7 +63,7 @@ class SocksHealthProbe(
     private suspend fun resolveCountry(socksPort: Int, credentials: SocksCredentials): String? =
         SocksHttp.request(socksPort, GEO_URL, "GET", PROBE_TIMEOUT_MS, credentials) { connection ->
             val body = connection.inputStream.use { it.readBytes().decodeToString() }
-            COUNTRY_REGEX.find(body)?.groupValues?.get(1)?.uppercase()
+            COUNTRY_REGEX.find(body)?.groupValues?.get(1)?.uppercase()?.takeIf { it != UNKNOWN_COUNTRY }
         }
 
     private fun java.net.HttpURLConnection.drain() {
@@ -76,7 +76,8 @@ class SocksHealthProbe(
         const val PROBE_TIMEOUT_MS = 6_000
         const val BYEDPI_TIMEOUT_MS = 4_000
         const val BYEDPI_ATTEMPTS = 3
-        const val GEO_URL = "https://api.ipapi.is/"
-        val COUNTRY_REGEX = Regex("\"(?:cc|country_code)\"\\s*:\\s*\"([A-Za-z]{2})\"")
+        const val GEO_URL = "https://www.cloudflare.com/cdn-cgi/trace"
+        const val UNKNOWN_COUNTRY = "XX"
+        val COUNTRY_REGEX = Regex("^loc=([A-Za-z]{2})$", RegexOption.MULTILINE)
     }
 }

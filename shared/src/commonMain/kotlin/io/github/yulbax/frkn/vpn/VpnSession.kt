@@ -95,16 +95,11 @@ class VpnSession(
             }
             throw error
         }
-        val structuralChange = desired.isStructuralChangeFrom(current)
         val serverSwitched = desired.selectedTag != current.selectedTag
-        if (!structuralChange && !serverSwitched) return ReloadOutcome.Done
+        if (!desired.isStructuralChangeFrom(current) && !serverSwitched) return ReloadOutcome.Done
 
         stateRepository.update(VpnState.Verifying)
-        if (!structuralChange && engine.selectProxy(desired.selectedTag)) {
-            commit(desired)
-        } else {
-            applyReload(desired)
-        }
+        applyReload(desired)
         startHealth()
         return ReloadOutcome.Done
     }
@@ -276,7 +271,11 @@ class VpnSession(
         log.i(TAG, "reconnect threshold reached; refreshing subscription '${profile.name}'")
         when (val result = store.refreshSubscription(profile)) {
             is ProfileOperationResult.Success ->
-                log.i(TAG, "subscription refreshed; engine will reload with new outbound")
+                if (result.affected == 0) {
+                    log.w(TAG, "subscription no longer lists this server; keeping it unchanged")
+                } else {
+                    log.i(TAG, "subscription refreshed; engine will reload with new outbound")
+                }
             ProfileOperationResult.EmptySubscription ->
                 log.i(TAG, "subscription refresh returned no servers")
             is ProfileOperationResult.FetchFailed ->

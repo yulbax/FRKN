@@ -33,6 +33,7 @@ object SocksHttp {
                     val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", socksPort))
                     val connection = URI(url).toURL().openConnection(proxy) as HttpURLConnection
                     connection.requestMethod = method
+                    connection.setRequestProperty("Connection", "close")
                     connection.connectTimeout = timeoutMs
                     connection.readTimeout = timeoutMs
                     connection.instanceFollowRedirects = false

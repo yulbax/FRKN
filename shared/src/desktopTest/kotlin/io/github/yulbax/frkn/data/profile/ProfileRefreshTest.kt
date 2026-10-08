@@ -4,6 +4,7 @@ import androidx.room.Room
 import io.github.yulbax.frkn.data.AppDatabase
 import io.github.yulbax.frkn.data.ConnectionType
 import io.github.yulbax.frkn.data.App
+import io.github.yulbax.frkn.proxy.LinkParser
 import io.github.yulbax.frkn.proxy.ParsedProfile
 import io.github.yulbax.frkn.proxy.ProxyProtocol
 import io.github.yulbax.frkn.util.AppLog
@@ -22,11 +23,12 @@ class ProfileRefreshTest {
     private lateinit var database: AppDatabase
     private lateinit var repository: ProfileRepository
     private val log = RecordingLog()
+    private val subscription = FakeSubscription()
 
     @Before
     fun setUp() {
         database = AppDatabase.build(Room.inMemoryDatabaseBuilder<AppDatabase>())
-        repository = ProfileRepository(database, database.profileDao(), NoSubscriptions, log)
+        repository = ProfileRepository(database, database.profileDao(), subscription, log)
     }
 
     @After
@@ -130,8 +132,77 @@ class ProfileRefreshTest {
         override fun e(tag: String, message: String, t: Throwable?) = Unit
     }
 
-    private object NoSubscriptions : SubscriptionProfileSource {
-        override suspend fun fetch(url: String): List<ParsedProfile> = emptyList()
+    private class FakeSubscription : SubscriptionProfileSource {
+        var links: List<String> = emptyList()
+        override suspend fun fetch(url: String): List<ParsedProfile> = links.mapNotNull(LinkParser::parse)
+    }
+
+    private suspend fun storedSubscriptionServer(link: String): ProfileEntity {
+        val parsed = requireNotNull(LinkParser.parse(link))
+        val id = database.profileDao().insert(
+            ProfileEntity(
+                name = parsed.name,
+                type = parsed.protocol.wire,
+                link = parsed.link,
+                outboundJson = parsed.outboundJson(),
+                subscriptionUrl = SUBSCRIPTION_URL
+            )
+        )
+        return database.profileDao().getAll().single { it.id == id }
+    }
+
+    private suspend fun refreshed(profile: ProfileEntity): ProfileEntity =
+        database.profileDao().getAll().single { it.id == profile.id }
+
+    @Test
+    fun refreshFollowsTheSameServerWhenTheProviderRenamesIt() = runBlocking {
+        val profile = storedSubscriptionServer("vless://$UUID@b.example:443?security=tls&sni=b.example#Germany")
+        subscription.links = listOf(
+            "vless://$UUID@a.example:443?security=tls&sni=a.example#Netherlands",
+            "vless://$UUID@b.example:443?security=tls&sni=b.example#Germany%20%7C%203%20GB%20left"
+        )
+
+        assertEquals(ProfileOperationResult.Success(affected = 1), repository.refreshSubscription(profile))
+
+        val stored = refreshed(profile)
+        assertTrue(stored.outboundJson.contains("b.example"))
+        assertEquals("Germany", stored.name)
+    }
+
+    @Test
+    fun refreshPicksUpNewCredentialsUnderTheSameName() = runBlocking {
+        val profile = storedSubscriptionServer("vless://$UUID@b.example:443?security=tls&sni=b.example#Germany")
+        subscription.links = listOf(
+            "vless://$UUID@a.example:443?security=tls&sni=a.example#Netherlands",
+            "vless://$OTHER_UUID@c.example:8443?security=tls&sni=c.example#Germany"
+        )
+
+        repository.refreshSubscription(profile)
+
+        assertTrue(refreshed(profile).outboundJson.contains("c.example"))
+    }
+
+    @Test
+    fun refreshNeverReplacesAServerTheSubscriptionNoLongerLists() = runBlocking {
+        val profile = storedSubscriptionServer("vless://$UUID@b.example:443?security=tls&sni=b.example#Germany")
+        subscription.links = listOf("vless://$UUID@a.example:443?security=tls&sni=a.example#Netherlands")
+
+        assertEquals(ProfileOperationResult.Success(affected = 0), repository.refreshSubscription(profile))
+
+        assertEquals(profile, refreshed(profile))
+    }
+
+    @Test
+    fun refreshLeavesAServerAloneWhenItsNameIsAmbiguous() = runBlocking {
+        val profile = storedSubscriptionServer("vless://$UUID@b.example:443?security=tls&sni=b.example#Germany")
+        subscription.links = listOf(
+            "vless://$UUID@a.example:443?security=tls&sni=a.example#Germany",
+            "vless://$UUID@c.example:443?security=tls&sni=c.example#Germany"
+        )
+
+        repository.refreshSubscription(profile)
+
+        assertEquals(profile, refreshed(profile))
     }
 
     @Test
@@ -153,6 +224,10 @@ class ProfileRefreshTest {
     }
 
     private companion object {
+        const val SUBSCRIPTION_URL = "https://sub.example/list"
+        const val UUID = "11111111-2222-3333-4444-555555555555"
+        const val OTHER_UUID = "66666666-7777-8888-9999-000000000000"
+
         const val STALE_DESCRIPTOR = """{"type":"wireguard","address":["10.8.1.2/32"],"private_key":"aPrivateKey=",""" +
             """"peers":[{"address":"vpn.example.com","port":51820,"public_key":"aPublicKey=",""" +
             """"pre_shared_key":"aPresharedKey=","allowed_ips":["0.0.0.0/0"],"persistent_keepalive_interval":"25-35"}]}"""

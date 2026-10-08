@@ -3,6 +3,7 @@ package io.github.yulbax.frkn.desktop
 import io.github.yulbax.frkn.util.AppLog
 import io.github.yulbax.frkn.vpn.core.EngineConfig
 import io.github.yulbax.frkn.vpn.core.EngineListener
+import io.github.yulbax.frkn.vpn.core.FingerprintErrorWatch
 import io.github.yulbax.frkn.vpn.core.ProxyDelay
 import io.github.yulbax.frkn.vpn.core.VpnEngine
 import io.github.yulbax.frkn.vpn.core.freeLoopbackPort
@@ -30,6 +31,7 @@ class ServiceEngine(
     @Volatile private var client: ServiceClient? = null
     @Volatile private var proxyTags: List<String> = emptyList()
     private var traffic: ScheduledExecutorService? = null
+    private val fingerprintErrors = FingerprintErrorWatch(::boxLog)
 
     @Synchronized
     override fun start(config: EngineConfig) {
@@ -57,11 +59,7 @@ class ServiceEngine(
         }
     }
 
-    override fun hasFingerprintError(): Boolean = runCatching {
-        boxLog()?.takeIf { it.exists() }?.useLines { lines ->
-            lines.any { it.contains("unsupported curve", ignoreCase = true) }
-        } ?: false
-    }.getOrDefault(false)
+    override fun hasFingerprintError(): Boolean = fingerprintErrors.hasError()
 
     @Synchronized
     override fun stop() {
@@ -71,6 +69,7 @@ class ServiceEngine(
     private fun launch(config: EngineConfig) {
         proxyTags = config.proxies.map { it.tag }
         val connected = service.connect()
+        fingerprintErrors.markCoreStart()
         connected.start(buildConfig(config))
         client = connected
         log.i(TAG, "sing-box started by the FRKN service ${service.hello?.version.orEmpty()}")

@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.yulbax.frkn.vpn.DefaultNetworkMonitor
 import io.github.yulbax.frkn.vpn.core.EngineConfig
 import io.github.yulbax.frkn.vpn.core.EngineListener
+import io.github.yulbax.frkn.vpn.core.FingerprintErrorWatch
 import io.github.yulbax.frkn.vpn.core.ProxyDelay
 import io.github.yulbax.frkn.vpn.core.TunAddress
 import io.github.yulbax.frkn.vpn.core.TunConfig
@@ -48,6 +49,8 @@ class SingBoxEngine(
 
     private val workDir = File(appContext.filesDir, "work")
     private val boxLogFile = File(workDir, "box.log")
+    private val cacheFile = File(workDir, "cache.db")
+    private val fingerprintErrors = FingerprintErrorWatch { boxLogFile }
 
     init {
         runCatching { go.Seq.setContext(appContext) }
@@ -86,17 +89,15 @@ class SingBoxEngine(
         val previous = boxService
         boxService = null
         runCatching { previous?.close() }
+        if (cacheFile.exists() && !cacheFile.delete()) log.w(TAG, "could not reset the sing-box cache file")
+        fingerprintErrors.markCoreStart()
         val service = Libbox.newService(buildConfig(config), this)
         service.start()
         boxService = service
         server.setService(service)
     }
 
-    override fun hasFingerprintError(): Boolean = runCatching {
-        boxLogFile.takeIf { it.exists() }?.useLines { lines ->
-            lines.any { it.contains("unsupported curve", ignoreCase = true) }
-        } ?: false
-    }.getOrDefault(false)
+    override fun hasFingerprintError(): Boolean = fingerprintErrors.hasError()
 
     override fun selectProxy(tag: String): Boolean = runCatching {
         Libbox.newStandaloneCommandClient().selectOutbound(ConfigBuilder.PROXY_GROUP_TAG, tag)
