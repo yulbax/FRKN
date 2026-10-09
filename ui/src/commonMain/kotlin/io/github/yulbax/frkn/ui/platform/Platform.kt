@@ -39,6 +39,9 @@ expect fun rememberSystemVpnSettings(): (() -> Unit)?
 expect fun rememberAppIcon(appId: String, path: String?): ImageBitmap?
 
 @Composable
+expect fun HoverHint(text: String, enabled: Boolean, content: @Composable () -> Unit)
+
+@Composable
 expect fun platformColorScheme(darkTheme: Boolean): ColorScheme?
 
 expect object AppLocale {

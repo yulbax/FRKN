@@ -170,3 +170,6 @@ actual val supportsSystemAppsFilter: Boolean = true
 actual val scrollbarAlwaysVisible: Boolean = false
 
 actual val platformTextStyle: PlatformTextStyle? = null
+
+@Composable
+actual fun HoverHint(text: String, enabled: Boolean, content: @Composable () -> Unit) = content()

@@ -2,6 +2,16 @@ package io.github.yulbax.frkn.ui.platform
 
 import io.github.yulbax.frkn.data.ConnectionType
 import androidx.compose.material3.ColorScheme
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
@@ -167,4 +177,33 @@ private fun systemUsesRgbClearType(): Boolean {
     val hints = runCatching { Toolkit.getDefaultToolkit().getDesktopProperty("awt.font.desktophints") }
         .getOrNull() as? Map<*, *> ?: return false
     return hints[RenderingHints.KEY_TEXT_ANTIALIASING] == RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+actual fun HoverHint(text: String, enabled: Boolean, content: @Composable () -> Unit) {
+    if (!enabled) {
+        content()
+        return
+    }
+    TooltipArea(
+        tooltip = {
+            Surface(
+                shape = MaterialTheme.shapes.extraSmall,
+                color = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shadowElevation = 4.dp
+            ) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        },
+        delayMillis = 500,
+        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp))
+    ) {
+        content()
+    }
 }
